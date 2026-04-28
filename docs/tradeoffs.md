@@ -96,6 +96,15 @@ The field-extraction stage uses lightweight token heuristics for `brand_name` an
 ### ResultsPage hard-refresh loses analysis state
 Analysis results live in React Router location state (`navigate("/results", { state: result })`). A hard refresh on `/results` drops that state and the page falls back to a "start a new review" prompt. This is intentional for the prototype: persisting result payloads to `sessionStorage` would create a class of stale-result bugs (old result re-rendered for a different image after a partial reload, expired sample images referenced by stale URL, etc.) without a clear win for the demo flow. The proper fix is the deferred review-history feature (SQLite-backed review IDs in the URL), not client-side caching.
 
+### PaddleOCR thread-safety on the free tier
+The upstream PaddlePaddle C++ predictor (`paddle::AnalysisPredictor::ZeroCopyRun`) is not thread-safe on a shared `PaddleOCR` instance — documented across [PaddleOCR #11605](https://github.com/PaddlePaddle/PaddleOCR/issues/11605) and [#16238](https://github.com/PaddlePaddle/PaddleOCR/issues/16238). Concurrent `.ocr()` calls produce nondeterministic `SIGSEGV` crashes inside the predictor. The official upstream guidance is "create a separate `PaddleOCR` object per thread," but each instance carries ~600 MB resident memory, which is more than the HF Spaces free tier reliably tolerates with two of them.
+
+**Decision:** serialize `.ocr()` calls behind a process-wide `threading.Lock` in `paddle_ocr.py` and run inference single-threaded (`OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`, `cpu_threads=1`). Concurrent reviews queue at the OCR step rather than running in parallel.
+
+**Trade-off:** parallel review throughput is capped at one at a time. On a 2-vCPU box this is not a real loss — two parallel CPU-bound OCR runs would not finish much faster than two sequential ones, and contention on the model weights would slow both. The `asyncio.to_thread` offload in the API layer is preserved, so `/health`, `/samples`, and other lightweight endpoints stay responsive while the OCR queue drains.
+
+If this prototype ever ran on a beefier instance, the right move is the upstream-recommended one: a small worker pool with one `PaddleOCR` instance per worker process (not thread). That removes the lock and unlocks true parallelism, but requires multiple workers' worth of RAM.
+
 ### Sample-outcomes test gating
 `backend/tests/test_sample_outcomes.py` exercises the end-to-end pipeline against the eleven seeded sample scenarios, but the strongest assertions (per-field expected status, governance-warning sub-codes) are gated behind the `real_ocr` pytest marker because the default test run uses the stub OCR provider. Under the stub, the test only asserts that the analysis completes and returns a structurally valid `AnalyzeResponse`. Real-OCR-gated assertions are deferred to a CI job with PaddleOCR weights cached; tracked in the roadmap.
 

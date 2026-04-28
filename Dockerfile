@@ -84,6 +84,23 @@ ENV ALV_SAMPLES_DIR=/home/user/app/sample_data
 ENV ALV_STATIC_DIR=/home/user/app/frontend_dist
 ENV PORT=7860
 
+# PaddlePaddle CPU build threading.
+#
+# HF Spaces sets OMP_NUM_THREADS=2 by default on its CPU instances. Paddle's
+# own startup warning explicitly says this fails when the binary is compiled
+# against OpenBlas ("It will fail if this PaddlePaddle binary is compiled
+# with OpenBlas since OpenBlas does not support multi-threads"). With
+# OMP_NUM_THREADS=2 plus concurrent .ocr() calls we observed deterministic
+# SIGSEGVs inside paddle::AnalysisPredictor::ZeroCopyRun().
+#
+# Pinning OMP/MKL to 1 thread, combined with cpu_threads=1 in the PaddleOCR
+# constructor and a process-wide lock around .ocr() in paddle_ocr.py, makes
+# inference single-threaded and crash-free on the free-tier 2-vCPU runtime.
+# Concurrency on the HTTP layer is preserved via asyncio.to_thread (concurrent
+# reviews queue at the OCR step but /health and /samples stay responsive).
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+
 EXPOSE 7860
 
 CMD ["uvicorn", "app.main:app", "--app-dir", "backend", "--host", "0.0.0.0", "--port", "7860"]

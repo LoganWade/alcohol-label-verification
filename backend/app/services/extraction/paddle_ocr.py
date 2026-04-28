@@ -32,15 +32,24 @@ from app.services.extraction.ocr import OcrProvider
 # subsequent requests skip that cost entirely.
 #
 # Concurrency: when the API handler offloads analyze() via asyncio.to_thread,
-# two simultaneous first-callers could each instantiate a PaddleOCR model and
-# one would be GC'd, doubling cold-start cost and memory. _init_lock guards
-# the lazy-init only — we deliberately do NOT serialize .ocr() calls behind
-# the lock, since that would defeat the purpose of running OCR in a worker
-# thread. PaddleOCR's thread-safety on shared instances is undocumented; the
-# expected concurrency for this take-home (single uvicorn worker on HF Spaces
-# free tier) makes contention unlikely.
+# two simultaneous calls could land on the same PaddleOCR instance. The
+# upstream C++ predictor (paddle::AnalysisPredictor::ZeroCopyRun) is NOT
+# thread-safe on a shared instance — see PaddleOCR issues #11605 and #16238.
+# Concurrent .ocr() calls produce nondeterministic SIGSEGV crashes inside
+# AnalysisPredictor::ZeroCopyRun(). The official upstream guidance is
+# "create a separate PaddleOCR object per thread", but on the HF Spaces
+# free tier (~600 MB resident set per instance) we cannot afford that.
+#
+# The pragmatic fix is to serialize .ocr() calls behind a process-wide lock.
+# This means concurrent reviews queue rather than running in parallel —
+# acceptable on a 2-vCPU box where parallel CPU-bound work would not have
+# been a true speedup anyway. /health and /samples remain responsive
+# because the asyncio.to_thread offload still keeps the event loop free.
+#
+# _init_lock guards lazy construction; _ocr_lock serializes inference calls.
 _paddle_instance: object | None = None
 _init_lock = threading.Lock()
+_ocr_lock = threading.Lock()
 
 
 def is_paddle_loaded() -> bool:
@@ -76,8 +85,17 @@ def _get_paddle() -> object:
                     "Alternatively, set ALV_OCR_PROVIDER=stub to use the deterministic stub."
                 ) from exc
 
+            # cpu_threads=1 prevents OpenMP/MKL-DNN parallelism inside the
+            # predictor. Combined with OMP_NUM_THREADS=1 in the Dockerfile,
+            # this is required to avoid a known crash class on PaddlePaddle
+            # CPU builds (Paddle's own warning: "It will fail if this
+            # PaddlePaddle binary is compiled with OpenBlas since OpenBlas
+            # does not support multi-threads.").
             _paddle_instance = PaddleOCR(
-                use_angle_cls=True, lang="en", show_log=False
+                use_angle_cls=True,
+                lang="en",
+                show_log=False,
+                cpu_threads=1,
             )
         return _paddle_instance
 
@@ -122,7 +140,13 @@ class PaddleOcrProvider(OcrProvider):
         # Run PaddleOCR
         # ----------------------------------------------------------------
         paddle = _get_paddle()
-        result = paddle.ocr(img, cls=True)  # type: ignore[union-attr]
+        # Serialize the .ocr() call: PaddleOCR's underlying C++ predictor is
+        # not thread-safe on a shared instance (see module docstring above).
+        # The lock is process-wide; concurrent reviews queue here. The
+        # asyncio.to_thread offload in the API layer keeps /health and
+        # /samples responsive while the queue is draining.
+        with _ocr_lock:
+            result = paddle.ocr(img, cls=True)  # type: ignore[union-attr]
 
         # ----------------------------------------------------------------
         # Normalise the result into OcrToken objects
