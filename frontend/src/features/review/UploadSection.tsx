@@ -3,8 +3,8 @@ import { FileImage, Upload, X } from "lucide-react";
 import { Button } from "@/components/Button";
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const ACCEPTED_MIME = ["image/png", "image/jpeg", "image/jpg", "application/pdf"];
-const ACCEPTED_LABEL = "PNG, JPG, or PDF up to 10 MB";
+const ACCEPTED_MIME = ["image/png", "image/jpeg", "image/jpg"];
+const ACCEPTED_LABEL = "PNG or JPG up to 10 MB";
 
 interface Props {
   file: File | null;
@@ -22,7 +22,7 @@ function validateFile(f: File): ValidateResult {
   if (!ACCEPTED_MIME.includes(f.type)) {
     return {
       ok: false,
-      error: `${f.type || "Unknown"} is not supported. Upload a PNG, JPG, or PDF.`,
+      error: `${f.type || "Unknown"} is not supported. Upload a PNG or JPG.`,
     };
   }
   if (f.size > MAX_BYTES) {
@@ -48,10 +48,6 @@ export function UploadSection({
 
   useEffect(() => {
     if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    if (file.type === "application/pdf") {
       setPreviewUrl(null);
       return;
     }
@@ -132,7 +128,7 @@ export function UploadSection({
           <input
             ref={inputRef}
             type="file"
-            accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
+            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
             className="sr-only"
             onChange={(e) => handleSelect(e.target.files?.[0] ?? null)}
             data-testid="input-file"

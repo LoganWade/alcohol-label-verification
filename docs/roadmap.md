@@ -93,7 +93,17 @@ Legibility checks are the first place where the output depends on **physical uni
 
 ## Longer-term
 
-### 5. COLA workflow awareness
+### 5. PDF input support
+
+The prototype accepts PNG and JPG only. Reviewers sometimes receive label artwork as PDFs (typically single-page exports from Illustrator or InDesign). Adding support means:
+
+- A rasterization step in `preprocess` using PyMuPDF (fast, no system deps) or pdf2image + poppler.
+- Multi-page handling: either restrict to first page, or surface a page picker in the UI when N > 1.
+- Content-Type re-enabled in `allowed_image_types`; corresponding frontend `accept` attribute change.
+
+**Architectural impact**: small. Single new helper in `preprocess` that branches on `application/pdf` and converts to a PIL `Image` before the existing path resumes. Bumps Docker image size by ~10-30 MB depending on rasterizer choice.
+
+### 6. COLA workflow awareness
 
 The project brief explicitly excludes COLA *integration*, but the regulations reference Allowable Revisions (changes that do not require a new COLA). Useful prototype-level features:
 
@@ -106,7 +116,7 @@ The project brief explicitly excludes COLA *integration*, but the regulations re
 
 These were considered as separate roadmap entries but fit better inside the rule packs in #1.
 
-### 6. Disclosure-language library
+### 7. Disclosure-language library
 
 Several disclosures have exact required wording the system should know about:
 

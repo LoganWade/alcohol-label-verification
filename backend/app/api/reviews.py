@@ -54,7 +54,7 @@ async def analyze_label(
                 code="unsupported_media_type",
                 message=(
                     f"File type {image.content_type!r} is not supported. "
-                    f"Please upload a PNG, JPEG, or single-page PDF."
+                    f"Please upload a PNG or JPEG image."
                 ),
                 recovery="Convert the file to PNG or JPEG and try again.",
             ).model_dump(),
@@ -102,12 +102,28 @@ async def analyze_label(
     try:
         expected = ExpectedFields.model_validate(expected_payload)
     except ValidationError as exc:
+        # Extract the field paths only (e.g. "brand_name", "abv") so we don't
+        # echo back the user's raw input values from exc.errors()[i]["input"].
+        # Pydantic's `loc` is a tuple of path segments — join with dots so
+        # nested errors render as "government_warning.text".
+        bad_fields = sorted(
+            {
+                ".".join(str(p) for p in err["loc"])
+                for err in exc.errors()
+                if err.get("loc")
+            }
+        )[:5]
+        recovery_hint = (
+            f"Check these fields against the schema: {', '.join(bad_fields)}."
+            if bad_fields
+            else "Check field names and types against the schema."
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_error(
                 code="invalid_expected_fields_schema",
                 message="expected_fields does not match the required shape.",
-                recovery=str(exc.errors()[:3]),
+                recovery=recovery_hint,
             ).model_dump(),
         ) from exc
 

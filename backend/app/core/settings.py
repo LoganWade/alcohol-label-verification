@@ -22,7 +22,10 @@ class Settings(BaseSettings):
 
     # Uploads
     max_upload_bytes: int = Field(default=10 * 1024 * 1024)  # 10 MB
-    allowed_image_types: tuple[str, ...] = ("image/png", "image/jpeg", "application/pdf")
+    # Note: application/pdf is intentionally NOT supported. The preprocess
+    # stage uses Pillow only and does not rasterize PDFs. PDF support is
+    # tracked in docs/roadmap.md as a future enhancement.
+    allowed_image_types: tuple[str, ...] = ("image/png", "image/jpeg")
 
     # OCR provider selection. Phase 1 ships only the stub provider; Phase 2
     # adds "paddle" and registers it via the provider factory.

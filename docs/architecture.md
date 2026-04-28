@@ -128,7 +128,7 @@ Aggregates everything into the API response, computes the overall summary status
 ### `POST /api/v1/reviews/analyze`
 
 **Request:** `multipart/form-data`
-- `image`: file (PNG/JPG/PDF page)
+- `image`: file (PNG or JPG; PDF support is on the roadmap)
 - `expected_fields`: JSON string
 
 ```json

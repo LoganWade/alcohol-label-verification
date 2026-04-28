@@ -94,13 +94,20 @@ class TestAnalyzeValidation:
         assert response.json()["detail"]["code"] == "invalid_expected_fields_json"
 
     def test_invalid_expected_fields_schema(self, client):
+        # Use a sentinel value that would be obviously visible if echoed back.
+        sentinel = "SENTINEL_INPUT_VALUE_xyz123"
         response = client.post(
             "/api/v1/reviews/analyze",
             files={"image": ("label.png", io.BytesIO(_PNG_1x1), "image/png")},
-            data={"expected_fields": json.dumps({"unknown_field": "x"})},
+            data={"expected_fields": json.dumps({"unknown_field": sentinel})},
         )
         assert response.status_code == 400
-        assert response.json()["detail"]["code"] == "invalid_expected_fields_schema"
+        detail = response.json()["detail"]
+        assert detail["code"] == "invalid_expected_fields_schema"
+        # Recovery hint must not leak the user's raw input value.
+        assert sentinel not in detail["recovery_hint"]
+        # It should reference the offending field name, though.
+        assert "unknown_field" in detail["recovery_hint"]
 
     def test_empty_file(self, client):
         response = client.post(

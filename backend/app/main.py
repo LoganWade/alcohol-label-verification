@@ -66,13 +66,18 @@ def create_app() -> FastAPI:
 
         # SPA catch-all: any GET path not matched above returns index.html so
         # React Router can handle client-side navigation.
+        #
+        # Real static assets (JS/CSS/images) are served by the /assets mount
+        # above. We deliberately do NOT resolve `full_path` against the static
+        # directory here: doing so requires careful path-traversal hardening
+        # (segments like `..` normalize via Path.resolve()) and we ship no
+        # root-level static files that would benefit from it. Returning
+        # index.html for every unmatched route keeps the surface minimal.
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(full_path: str) -> FileResponse:
-            # If the requested path is a real file (e.g. favicon.ico, robots.txt)
-            # serve it directly; otherwise fall back to index.html.
-            candidate = Path(settings.static_dir) / full_path  # type: ignore[arg-type]
-            if candidate.is_file():
-                return FileResponse(candidate)
+            # full_path is consumed by the route matcher; the value isn't used
+            # in the body since we always return index.html.
+            del full_path
             return FileResponse(static_index)
 
     return app

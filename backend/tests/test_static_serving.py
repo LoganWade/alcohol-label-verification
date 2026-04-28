@@ -97,6 +97,22 @@ def test_spa_fallback_for_unknown_route(client_with_static: TestClient) -> None:
     assert "Test App" in response.text
 
 
+def test_path_traversal_does_not_leak_files(client_with_static: TestClient) -> None:
+    """Catch-all must never serve files outside the static dir.
+
+    Even when a normalized path resolves to a real file on disk (e.g.
+    /etc/hostname), the SPA handler should fall back to index.html. We don't
+    do any path resolution in the handler; this test guards against future
+    regressions that reintroduce manual file resolution.
+    """
+    # Starlette normalizes /../ in the URL path before routing, so this
+    # request is effectively GET /etc/hostname after normalization.
+    response = client_with_static.get("/../../../../etc/hostname")
+    assert response.status_code == 200
+    # The response body must be index.html, NOT the contents of /etc/hostname.
+    assert "Test App" in response.text
+
+
 # ---------------------------------------------------------------------------
 # Without static dir (dev mode)
 # ---------------------------------------------------------------------------

@@ -58,7 +58,7 @@ These items were considered and explicitly cut for the time box. Each is structu
 - **Authentication, user roles, audit logging.** Federal-grade auth is months of work and out of scope for a prototype.
 - **COLA integration.** Marcus explicitly said this is a different project entirely.
 - **FedRAMP / production compliance posture.** Same reasoning.
-- **PDF multipage handling.** Single-page PDF is supported via image conversion; multipage is deferred.
+- **PDF input.** Not supported in this prototype. The preprocess stage uses Pillow only and does not rasterize PDFs. Adding PDF support requires a rasterizer (PyMuPDF or pdf2image + poppler) plus per-page handling logic; tracked in the roadmap.
 - **Beverage-type-specific rule packs.** Beer, wine, and spirits each have nuanced TTB requirements. The prototype supports the seven common fields well; full type-specific rule sets are future work.
 - **Multi-language OCR.** English only.
 - **Mobile-native experience.** The UI is responsive but desktop-first.
@@ -69,6 +69,20 @@ These items were considered and explicitly cut for the time box. Each is structu
 - The Government Warning validator's "header is in all caps" check depends on OCR preserving case. Some OCR engines normalize case; PaddleOCR generally preserves it on labels with strong contrast, but extreme cases will be flagged as `Uncertain`.
 - The 5-second budget assumes a typical phone-quality label photo (~2–4 megapixels) on the deployment instance's CPU. Very large images will exceed it; the UI surfaces processing time so reviewers see when this happens.
 - Sample data is a mix of synthetic AI-generated labels and public TTB reference imagery. None of it is real submission data.
+
+## Operational notes
+
+### CORS configuration
+The prototype defaults `cors_origins` to localhost ports for Vite dev. The Hugging Face Spaces deployment serves the built frontend and the API from the same origin, so CORS is not in play there. For split deployments (frontend on a CDN, API elsewhere), set `ALV_CORS_ORIGINS` to a comma-separated list of allowed origins, e.g.:
+
+```
+ALV_CORS_ORIGINS=https://app.example.com,https://staging.example.com
+```
+
+Values are read by `pydantic-settings` as a tuple. Verify exact env-var parsing semantics for your `pydantic-settings` version before assuming list-style coercion works.
+
+### Frontend npm audit findings
+`npm audit` reports 5 moderate findings against `esbuild` (≤0.24.2) and `vite` (≤6.4.1) in the dev toolchain. The CVEs concern the development server (`vite dev`) accepting cross-origin requests. The production build artifact (`vite build` output served as static files by FastAPI) is unaffected — esbuild and the dev server are not present in the runtime container. Upgrading to Vite 7 / Vitest 3 is on the radar but deferred for take-home scope (config migration + test re-validation). Do not expose `vite dev` to untrusted networks.
 
 ## Decisions to revisit if this becomes more than a prototype
 

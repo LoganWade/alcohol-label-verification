@@ -65,7 +65,7 @@ All five field statuses share the same `<StatusChip>` component, which carries t
 1. **Home** (`/`) — headline + two cards: "Start a label review" and "Try with sample data".
 2. **New review** (`/review/new`) — single page, three progressively disclosed sections:
    - Expected fields form (Form / Paste JSON / Load sample tabs)
-   - Upload (drag-and-drop + file picker, preview, 10 MB / PNG-JPG-PDF guard)
+   - Upload (drag-and-drop + file picker, preview, 10 MB / PNG-JPG guard)
    - Processing (cycling stages, elapsed counter, 8-second long-running message, working Cancel via `AbortController`)
 3. **Results** (`/review/:id`) — large status chip + headline + elapsed time, then a field-by-field comparison table. The Government Warning has its **own bottom row** with `header_caps_ok` and `wording_match` sub-flags surfaced. Every row is expandable to show raw OCR text (verbatim), confidence, comparison reason, and bounding box coordinates. Footer offers Run another review, Export results (JSON), and Print.
 
