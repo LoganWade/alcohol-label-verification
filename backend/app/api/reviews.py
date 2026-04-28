@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -128,8 +129,15 @@ async def analyze_label(
         ) from exc
 
     # --- Run pipeline ----------------------------------------------------
+    # The pipeline is fully synchronous (OpenCV preprocess + PaddleOCR is
+    # CPU-bound, ~1-3 s on the HF Spaces runtime). Because this handler is
+    # `async def`, FastAPI will run its body on the event loop — not in a
+    # threadpool — so a naked synchronous call would block every other
+    # request (including /health and /samples) for the duration. We offload
+    # to a worker thread via asyncio.to_thread so concurrent requests stay
+    # responsive on a single uvicorn worker (HF Spaces free tier).
     try:
-        return analyze(image_bytes=body, expected=expected)
+        return await asyncio.to_thread(analyze, body, expected)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

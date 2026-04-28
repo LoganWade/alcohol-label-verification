@@ -112,6 +112,16 @@ The project brief explicitly excludes COLA *integration*, but the regulations re
 
 **Architectural impact**: a per-rule metadata flag (`allowable_revision: bool`) and a PDF reporter. Modest. Listed as longer-term because it leans into workflow assumptions outside the current prototype scope.
 
+## Engineering / test coverage
+
+### Real-OCR CI job
+
+`backend/tests/test_sample_outcomes.py` exercises the eleven seeded sample scenarios end-to-end through the analysis pipeline. Under the default test suite (stub OCR provider) it can only assert structural validity of the response. The strongest assertions — per-field expected-status comparisons and Government Warning sub-codes against known-good labels — are gated behind the `real_ocr` pytest marker and skipped by default. A nightly CI job with cached PaddleOCR weights would run the gated path and surface regressions in the heuristic extractors and warning validator before they ship. **Architectural impact:** none; the marker and tests already exist. Pure CI work.
+
+### Region-aware field extraction
+
+The brand-name and class-of-fluid extractors today rely on token heuristics (title-case detection, keyword lists, exclusion of obvious non-brand patterns). They are fragile against stylized typography and ornamental layouts (see [tradeoffs.md](./tradeoffs.md#brandclass-of-fluid-heuristic-limits)). A layout-anchored replacement — "largest text region in the upper third of the label" for brand, "line immediately above or below the brand mark and not matching net-contents/ABV/warning patterns" for class-of-fluid — would consume the bounding-box data PaddleOCR already returns and produce more defensible extractions on real-world labels. Folds naturally into the legibility-check stage from #4 since both consume the same `LabelGeometry` plumbing.
+
 ## Folded into other items
 
 These were considered as separate roadmap entries but fit better inside the rule packs in #1.

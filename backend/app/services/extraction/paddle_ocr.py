@@ -18,6 +18,7 @@ Per AGENTS.md:
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Sequence
 
 import cv2
@@ -29,27 +30,56 @@ from app.services.extraction.ocr import OcrProvider
 # Module-level singleton - instantiated lazily on first ``extract()`` call.
 # PaddleOCR's constructor triggers model loading (~1-3 s); caching here means
 # subsequent requests skip that cost entirely.
+#
+# Concurrency: when the API handler offloads analyze() via asyncio.to_thread,
+# two simultaneous first-callers could each instantiate a PaddleOCR model and
+# one would be GC'd, doubling cold-start cost and memory. _init_lock guards
+# the lazy-init only — we deliberately do NOT serialize .ocr() calls behind
+# the lock, since that would defeat the purpose of running OCR in a worker
+# thread. PaddleOCR's thread-safety on shared instances is undocumented; the
+# expected concurrency for this take-home (single uvicorn worker on HF Spaces
+# free tier) makes contention unlikely.
 _paddle_instance: object | None = None
+_init_lock = threading.Lock()
+
+
+def is_paddle_loaded() -> bool:
+    """Return True if the PaddleOCR singleton has been initialised.
+
+    Used by the /health endpoint to surface real readiness state instead of
+    a hard-coded True. After the model preload step in the Dockerfile +
+    a warmup ping after deploy, this should be True before any user request
+    hits the analyze endpoint.
+    """
+    return _paddle_instance is not None
 
 
 def _get_paddle() -> object:
     """Return the shared PaddleOCR instance, loading the model on first call."""
     global _paddle_instance
-    if _paddle_instance is None:
-        # Import deferred so the module can be *imported* without paddle
-        # installed — the ImportError surfaces only on first use, giving the
-        # caller a clean path to detect the missing dep.
-        try:
-            from paddleocr import PaddleOCR  # type: ignore[import]
-        except ImportError as exc:
-            raise ImportError(
-                "PaddleOCR is not installed. "
-                "Install it with: pip install 'paddleocr>=2.7,<3' 'paddlepaddle>=2.6,<3'. "
-                "Alternatively, set ALV_OCR_PROVIDER=stub to use the deterministic stub."
-            ) from exc
+    # Fast path: already initialised. Skips lock acquisition for hot calls.
+    if _paddle_instance is not None:
+        return _paddle_instance
+    with _init_lock:
+        # Double-checked: another thread may have initialised between our
+        # fast-path check and acquiring the lock.
+        if _paddle_instance is None:
+            # Import deferred so the module can be *imported* without paddle
+            # installed — the ImportError surfaces only on first use, giving the
+            # caller a clean path to detect the missing dep.
+            try:
+                from paddleocr import PaddleOCR  # type: ignore[import]
+            except ImportError as exc:
+                raise ImportError(
+                    "PaddleOCR is not installed. "
+                    "Install it with: pip install 'paddleocr>=2.7,<3' 'paddlepaddle>=2.6,<3'. "
+                    "Alternatively, set ALV_OCR_PROVIDER=stub to use the deterministic stub."
+                ) from exc
 
-        _paddle_instance = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
-    return _paddle_instance
+            _paddle_instance = PaddleOCR(
+                use_angle_cls=True, lang="en", show_log=False
+            )
+        return _paddle_instance
 
 
 class PaddleOcrProvider(OcrProvider):

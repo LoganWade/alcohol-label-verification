@@ -20,12 +20,16 @@ interface Props {
   initialMode?: Mode;
 }
 
+// All-null EMPTY: blank optional fields ship as null on the wire so the
+// backend's compare_field treats them as "not supplied" rather than
+// comparing against an empty string. Required fields are still null when
+// blank — `expectedFieldsAreReady` enforces non-empty values before submit.
 const EMPTY: ExpectedFields = {
-  brand_name: "",
-  class_type: "",
-  alcohol_content: "",
-  net_contents: "",
-  bottler: "",
+  brand_name: null,
+  class_type: null,
+  alcohol_content: null,
+  net_contents: null,
+  bottler: null,
   country_of_origin: null,
   warning: null,
 };
@@ -153,7 +157,7 @@ export function ExpectedFieldsForm({
             label="Brand name"
             placeholder="e.g. Old Tom Distillery"
             value={value.brand_name ?? ""}
-            onChange={(e) => update("brand_name", e.target.value)}
+            onChange={(e) => update("brand_name", e.target.value || null)}
             data-testid="input-brand_name"
             required
           />
@@ -161,14 +165,14 @@ export function ExpectedFieldsForm({
             label="Class / type"
             placeholder="e.g. Kentucky Straight Bourbon Whiskey"
             value={value.class_type ?? ""}
-            onChange={(e) => update("class_type", e.target.value)}
+            onChange={(e) => update("class_type", e.target.value || null)}
             data-testid="input-class_type"
           />
           <TextField
             label="Alcohol content"
             placeholder="e.g. 45% Alc./Vol."
             value={value.alcohol_content ?? ""}
-            onChange={(e) => update("alcohol_content", e.target.value)}
+            onChange={(e) => update("alcohol_content", e.target.value || null)}
             data-testid="input-alcohol_content"
             required
           />
@@ -176,14 +180,14 @@ export function ExpectedFieldsForm({
             label="Net contents"
             placeholder="e.g. 750 mL"
             value={value.net_contents ?? ""}
-            onChange={(e) => update("net_contents", e.target.value)}
+            onChange={(e) => update("net_contents", e.target.value || null)}
             data-testid="input-net_contents"
           />
           <TextField
             label="Bottler / producer"
             placeholder="e.g. Bottled by Old Tom Co., Frankfort, KY"
             value={value.bottler ?? ""}
-            onChange={(e) => update("bottler", e.target.value)}
+            onChange={(e) => update("bottler", e.target.value || null)}
             data-testid="input-bottler"
           />
           <TextField

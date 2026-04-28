@@ -11,6 +11,8 @@ interface Props {
   onFileChange: (f: File | null) => void;
   onRun: () => void;
   disabled?: boolean;
+  /** Soft warning shown above the run button; non-blocking. */
+  warning?: string;
 }
 
 interface ValidateResult {
@@ -40,6 +42,7 @@ export function UploadSection({
   onFileChange,
   onRun,
   disabled,
+  warning,
 }: Props) {
   const [error, setError] = useState<string | undefined>();
   const [isDragging, setIsDragging] = useState(false);
@@ -183,6 +186,16 @@ export function UploadSection({
           data-testid="text-upload-error"
         >
           {error}
+        </p>
+      )}
+
+      {warning && !error && (
+        <p
+          role="status"
+          className="text-sm text-status-review-text"
+          data-testid="text-upload-warning"
+        >
+          {warning}
         </p>
       )}
 

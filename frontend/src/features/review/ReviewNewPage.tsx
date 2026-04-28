@@ -15,12 +15,15 @@ import { ErrorPanel } from "@/components/ErrorPanel";
 
 type Step = "fields" | "upload" | "processing";
 
+// All-null EMPTY: blank fields ship as null on the wire so the backend
+// treats them as "not supplied" rather than empty-string mismatches.
+// `expectedFieldsAreReady` enforces non-empty required fields before submit.
 const EMPTY: ExpectedFields = {
-  brand_name: "",
-  class_type: "",
-  alcohol_content: "",
-  net_contents: "",
-  bottler: "",
+  brand_name: null,
+  class_type: null,
+  alcohol_content: null,
+  net_contents: null,
+  bottler: null,
   country_of_origin: null,
   warning: null,
 };
@@ -56,6 +59,7 @@ export function ReviewNewPage() {
   const [step, setStep] = useState<Step>("fields");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<AnalyzeError | null>(null);
+  const [uploadWarning, setUploadWarning] = useState<string | undefined>();
   const abortRef = useRef<AbortController | null>(null);
 
   // -------------------------------------------------------------------------
@@ -86,24 +90,36 @@ export function ReviewNewPage() {
 
   // -------------------------------------------------------------------------
   // For named samples, pre-set the file to the sample image so the reviewer
-  // can just hit Run without uploading anything.
+  // can just hit Run without uploading anything. If the prefetch fails for
+  // any reason (network, 500, abort), surface a soft warning so the reviewer
+  // knows they need to upload manually rather than seeing a silent no-op.
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!namedSample || !sampleId) return;
     const imageUrl = getSampleImageUrl(sampleId);
-    // Fetch the PNG and wrap in a File object so the existing upload path
-    // (which calls analyzeLabel with a File) works unchanged.
+    const ctrl = new AbortController();
     void (async () => {
       try {
-        const res = await fetch(imageUrl);
-        if (!res.ok) return;
+        const res = await fetch(imageUrl, { signal: ctrl.signal });
+        if (!res.ok) {
+          setUploadWarning(
+            "Sample image is unavailable right now. Choose a label file to continue.",
+          );
+          return;
+        }
         const blob = await res.blob();
         const f = new File([blob], `${sampleId}.png`, { type: "image/png" });
         setFile(f);
-      } catch {
-        // Non-fatal — user can still upload their own image.
+        setUploadWarning(undefined);
+      } catch (err) {
+        // Aborts (component unmount or sampleId change) are expected — stay silent.
+        if ((err as Error)?.name === "AbortError") return;
+        setUploadWarning(
+          "Sample image could not be loaded. Choose a label file to continue.",
+        );
       }
     })();
+    return () => ctrl.abort();
   }, [namedSample, sampleId]);
 
   // -------------------------------------------------------------------------
@@ -179,6 +195,7 @@ export function ReviewNewPage() {
           onFileChange={setFile}
           onRun={handleRun}
           disabled={step === "processing"}
+          warning={uploadWarning}
         />
       )}
 

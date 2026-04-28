@@ -35,7 +35,10 @@ export function ProcessingSection({ startedAt, onCancel }: Props) {
   useEffect(() => {
     const tick = () => setElapsed(Date.now() - startedAt);
     tick();
-    const id = window.setInterval(tick, 100);
+    // 250 ms ticks: counter format is second-resolution (mm:ss), so ~4 fps
+    // is more than enough. Avoids ~10 re-renders/sec across the route subtree
+    // for an OCR run that can take 8–10s on slow hardware.
+    const id = window.setInterval(tick, 250);
     return () => window.clearInterval(id);
   }, [startedAt]);
 

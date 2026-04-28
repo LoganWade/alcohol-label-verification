@@ -42,6 +42,15 @@ def compare_field(
 
     raw = extracted.raw_text
 
+    # Treat whitespace-only or empty expected values as "not supplied".
+    # Frontend forms send "" rather than null for blank optional fields, so
+    # without this normalization we'd compare against an empty string and
+    # produce spurious Missing/Mismatch rows for fields the reviewer never
+    # intended to check. Defense in depth: the frontend should also coerce
+    # empty -> null before sending, but the backend must not rely on that.
+    if expected is not None and not expected.strip():
+        expected = None
+
     # Caller did not supply an expected value: nothing to compare against.
     if expected is None:
         return FieldComparison(

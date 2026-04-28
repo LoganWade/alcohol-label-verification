@@ -73,16 +73,31 @@ These items were considered and explicitly cut for the time box. Each is structu
 ## Operational notes
 
 ### CORS configuration
-The prototype defaults `cors_origins` to localhost ports for Vite dev. The Hugging Face Spaces deployment serves the built frontend and the API from the same origin, so CORS is not in play there. For split deployments (frontend on a CDN, API elsewhere), set `ALV_CORS_ORIGINS` to a comma-separated list of allowed origins, e.g.:
+The prototype defaults `cors_origins` to localhost ports for Vite dev. The Hugging Face Spaces deployment serves the built frontend and the API from the same origin, so CORS is not in play there. For split deployments (frontend on a CDN, API elsewhere), set `ALV_CORS_ORIGINS` to a JSON array of allowed origins, e.g.:
 
 ```
-ALV_CORS_ORIGINS=https://app.example.com,https://staging.example.com
+ALV_CORS_ORIGINS='["https://app.example.com","https://staging.example.com"]'
 ```
 
-Values are read by `pydantic-settings` as a tuple. Verify exact env-var parsing semantics for your `pydantic-settings` version before assuming list-style coercion works.
+`pydantic-settings` parses JSON for complex (list/tuple) fields when the matching env var is set; comma-separated strings are NOT auto-split. Always pass a JSON array, even for a single origin. Verified at runtime.
 
 ### Frontend npm audit findings
 `npm audit` reports 5 moderate findings against `esbuild` (≤0.24.2) and `vite` (≤6.4.1) in the dev toolchain. The CVEs concern the development server (`vite dev`) accepting cross-origin requests. The production build artifact (`vite build` output served as static files by FastAPI) is unaffected — esbuild and the dev server are not present in the runtime container. Upgrading to Vite 7 / Vitest 3 is on the radar but deferred for take-home scope (config migration + test re-validation). Do not expose `vite dev` to untrusted networks.
+
+### Brand/class-of-fluid heuristic limits
+The field-extraction stage uses lightweight token heuristics for `brand_name` and `class_of_fluid` (lines that are mostly title-case, contain known keywords like "VODKA" / "WHISKEY", and are not obviously addresses, ABV strings, government warnings, or net-contents). On clean studio labels this works well, but it is fragile against:
+
+- Stylized brand marks where the brand name is a logotype rendered in a script font (PaddleOCR may emit fragmented or mis-cased tokens).
+- Labels where the class of fluid is rendered as ornamental adornment around the brand mark ("FINE - SMALL BATCH - VODKA - DISTILLED" arranged radially).
+- Foreign-language adornment phrases ("Distilled & Bottled by", "Estate Reserve") that contain capitalized words but are not the brand.
+
+**Mitigation today:** When confidence is low or extraction fails, the field is reported as `Uncertain` rather than guessed, and the per-field confidence shown in the UI lets reviewers spot weak extractions. The roadmap's Phase 2 "region-aware extraction" replaces these heuristics with layout-anchored extraction (largest text region above the class-of-fluid line, etc.), which is the right long-term fix.
+
+### ResultsPage hard-refresh loses analysis state
+Analysis results live in React Router location state (`navigate("/results", { state: result })`). A hard refresh on `/results` drops that state and the page falls back to a "start a new review" prompt. This is intentional for the prototype: persisting result payloads to `sessionStorage` would create a class of stale-result bugs (old result re-rendered for a different image after a partial reload, expired sample images referenced by stale URL, etc.) without a clear win for the demo flow. The proper fix is the deferred review-history feature (SQLite-backed review IDs in the URL), not client-side caching.
+
+### Sample-outcomes test gating
+`backend/tests/test_sample_outcomes.py` exercises the end-to-end pipeline against the eleven seeded sample scenarios, but the strongest assertions (per-field expected status, governance-warning sub-codes) are gated behind the `real_ocr` pytest marker because the default test run uses the stub OCR provider. Under the stub, the test only asserts that the analysis completes and returns a structurally valid `AnalyzeResponse`. Real-OCR-gated assertions are deferred to a CI job with PaddleOCR weights cached; tracked in the roadmap.
 
 ## Decisions to revisit if this becomes more than a prototype
 

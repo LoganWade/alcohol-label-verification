@@ -14,6 +14,12 @@ For now all tests use the stub provider.  The stub returns deterministic
 canned values so outcome assertions use the stub's canned fields, not the
 synthetic label's actual text.  The goal is to verify the pipeline mechanics
 (the seven-stage contract stays intact) rather than end-to-end OCR accuracy.
+
+Known limitation: under the stub provider the per-field expected_outcome
+comparisons and Government Warning sub-codes are not exercised end-to-end.
+Those assertions live in real_ocr-marked tests and require a CI job with
+PaddleOCR weights cached. See docs/roadmap.md "Real-OCR CI job" for the
+tracked follow-up.
 """
 
 from __future__ import annotations

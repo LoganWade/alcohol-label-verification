@@ -13,7 +13,12 @@ import uuid
 from app import __version__
 from app.core.constants import Confidence, ImageQuality
 from app.core.settings import settings
-from app.schemas.fields import ExpectedFields, FieldName
+from app.schemas.fields import (
+    ExpectedFields,
+    ExtractedField,
+    ExtractedFields,
+    FieldName,
+)
 from app.schemas.pipeline import StageTimings
 from app.schemas.review import (
     AnalyzeResponse,
@@ -44,27 +49,44 @@ _DOWNGRADE_MAP: dict[Confidence, Confidence] = {
 }
 
 
-def _downgrade_comparison_confidence(comparison: FieldComparison) -> FieldComparison:
-    """Return a copy of ``comparison`` with confidence downgraded one tier.
+def _downgrade_extracted_field(field: ExtractedField) -> ExtractedField:
+    """Return a copy of ``field`` with confidence downgraded one tier.
 
-    Used when the preprocess stage reports ``POOR`` image quality — per AGENTS.md
-    uncertainty must propagate forward rather than asserting false certainty.
-    Only HIGH→MEDIUM and MEDIUM→LOW downgrades are applied; LOW and UNCERTAIN
-    are already at the floor and are left unchanged.
+    Used when the preprocess stage reports ``POOR`` image quality. Per
+    AGENTS.md uncertainty must propagate forward rather than asserting
+    false certainty. We downgrade the EXTRACTED fields (not the comparison
+    results) because compare_field reads extracted.confidence to decide
+    whether to demote a Match to Needs Review via the LOW-confidence path.
+    Downgrading after comparison would let MEDIUM-confidence Matches stay
+    as Match with a misleading LOW confidence label.
     """
-    new_confidence = _DOWNGRADE_MAP[comparison.confidence]
-    if new_confidence == comparison.confidence:
-        return comparison  # no change needed — avoid creating an unnecessary copy
-
-    # FieldComparison is frozen; use model_copy to produce an updated instance.
-    return comparison.model_copy(update={"confidence": new_confidence})
+    # `.get()` defends against future Confidence tiers being added without
+    # a corresponding entry in _DOWNGRADE_MAP — would otherwise 500 the request.
+    new_confidence = _DOWNGRADE_MAP.get(field.confidence, field.confidence)
+    if new_confidence == field.confidence:
+        return field
+    # ExtractedField is a Pydantic model; use model_copy for an updated instance.
+    return field.model_copy(update={"confidence": new_confidence})
 
 
 def _apply_poor_quality_downgrade(
-    comparisons: list[FieldComparison],
-) -> list[FieldComparison]:
-    """Downgrade all comparison confidences by one tier (POOR quality guard)."""
-    return [_downgrade_comparison_confidence(c) for c in comparisons]
+    extracted: ExtractedFields,
+) -> ExtractedFields:
+    """Downgrade every extracted field's confidence by one tier (POOR quality)."""
+    return extracted.model_copy(
+        update={
+            name: _downgrade_extracted_field(getattr(extracted, name))
+            for name in (
+                "brand_name",
+                "class_type",
+                "alcohol_content",
+                "net_contents",
+                "bottler",
+                "country_of_origin",
+                "warning",
+            )
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +118,15 @@ def analyze(image_bytes: bytes, expected: ExpectedFields) -> AnalyzeResponse:
     t0 = _now_ms()
     extracted = extract_fields(tokens)
     timings.field_extraction_ms = _now_ms() - t0
+
+    # Propagate image-quality uncertainty BEFORE comparison runs. The
+    # comparator reads extracted.confidence to decide whether to demote a
+    # Match to Needs Review (LOW-confidence path), so applying the downgrade
+    # afterward would let MEDIUM-confidence Matches stay as Match with a
+    # misleading LOW confidence label. AGENTS.md: "uncertainty propagates
+    # forward" across the preprocess→extraction boundary.
+    if preprocess_output.quality_report.quality is ImageQuality.POOR:
+        extracted = _apply_poor_quality_downgrade(extracted)
 
     # --- 5. Comparison --------------------------------------------------
     t0 = _now_ms()
@@ -129,14 +160,6 @@ def analyze(image_bytes: bytes, expected: ExpectedFields) -> AnalyzeResponse:
         comparisons.append(
             compare_field(field=name, expected=exp_value, extracted=ext_value)
         )
-
-    # Propagate image-quality uncertainty: if preprocessing flagged POOR
-    # quality, downgrade all extracted-field confidences before comparison
-    # results are finalised.  This implements the AGENTS.md rule that
-    # "uncertainty propagates forward" across the preprocess→extraction
-    # boundary.
-    if preprocess_output.quality_report.quality is ImageQuality.POOR:
-        comparisons = _apply_poor_quality_downgrade(comparisons)
 
     timings.comparison_ms = _now_ms() - t0
 

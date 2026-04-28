@@ -38,7 +38,16 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parent.parent.parent.parent / "sample_data"
     )
 
-    # CORS for local frontend dev. Tightened in deployment.
+    # CORS allow-list for the frontend. Defaults cover local Vite/CRA dev.
+    #
+    # Override at runtime by setting ALV_CORS_ORIGINS to a JSON array, e.g.:
+    #   ALV_CORS_ORIGINS='["https://my-space.hf.space","https://example.com"]'
+    # pydantic-settings parses JSON for complex (list/tuple) fields when the
+    # corresponding env var is set. Single-string values (no JSON) will not
+    # be split — always pass a JSON array, even for a single origin.
+    #
+    # In Hugging Face Spaces deployments served from a single origin, leave
+    # this unset: same-origin requests don't require CORS headers.
     cors_origins: tuple[str, ...] = (
         "http://localhost:5173",
         "http://localhost:3000",

@@ -145,3 +145,30 @@ class TestMissingAndAbsent:
             extracted=_extracted(None, confidence=Confidence.UNCERTAIN),
         )
         assert result.status is FieldStatus.MISSING
+
+    def test_empty_string_expected_treated_as_unsupplied(self):
+        """Frontend forms send '' for blank optional fields; treat as None.
+
+        Without this coercion, an empty expected would fall through to the
+        comparison branch and produce a spurious Mismatch / Missing row
+        against whatever was extracted (or against an empty string),
+        misleading the reviewer.
+        """
+        result = compare_field(
+            field=FieldName.CLASS_TYPE,
+            expected="",
+            extracted=_extracted("Bourbon Whiskey"),
+        )
+        # Behaves the same as expected=None: NEEDS_REVIEW because something
+        # was extracted but no expected value was supplied to compare against.
+        assert result.status is FieldStatus.NEEDS_REVIEW
+        assert result.expected is None
+
+    def test_whitespace_only_expected_treated_as_unsupplied(self):
+        result = compare_field(
+            field=FieldName.CLASS_TYPE,
+            expected="   \t  ",
+            extracted=_extracted(None, confidence=Confidence.UNCERTAIN),
+        )
+        assert result.status is FieldStatus.MISSING
+        assert result.expected is None

@@ -51,7 +51,7 @@ COPY --chown=user backend/pyproject.toml backend/README.md ./backend/
 COPY --chown=user backend/app ./backend/app
 
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -e ./backend
+ && pip install --no-cache-dir ./backend
 
 # ------------------------------------------------------------------
 # Pre-download PaddleOCR model weights at build time so cold starts
@@ -59,12 +59,16 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ~/.paddleocr (i.e. /home/user/.paddleocr).
 #
 # If the build network blocks outbound HTTPS, this step will fail with
-# a connection error.  In that case, remove or comment out this RUN
-# line and the models will be downloaded on first request instead.
+# a connection error.  Rather than failing the entire image build, we
+# write a sentinel file (.paddle_preload_failed) which the /health
+# endpoint surfaces so deploy operators can see that models will be
+# fetched on first request instead.  The container still starts and
+# serves traffic (PaddleOCR will lazy-download on first call).
 # Alternatively, mount a paddle_models/ volume at /home/user/.paddleocr.
 # ------------------------------------------------------------------
 RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='en', show_log=False)" \
-    || echo "WARNING: PaddleOCR weight pre-download failed (likely network restriction). Models will be downloaded on first use."
+    || ( echo "WARNING: PaddleOCR weight pre-download failed (likely network restriction). Models will be downloaded on first use." \
+         && touch /home/user/app/.paddle_preload_failed )
 
 # ------------------------------------------------------------------
 # Copy built frontend and sample data
