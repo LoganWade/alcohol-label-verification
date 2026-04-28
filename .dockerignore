@@ -1,0 +1,27 @@
+# Version control
+.git
+.gitignore
+
+# Node / frontend build artifacts
+**/node_modules
+**/dist
+**/.tsbuildinfo
+frontend/dist
+
+# Python artifacts
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/*.egg-info
+backend/.venv
+backend/*.egg-info
+
+# Virtual environments
+**/.venv
+
+# Editor / IDE
+.vscode
+.idea
+
+# OS
+.DS_Store

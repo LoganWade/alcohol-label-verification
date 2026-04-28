@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+.vite/
+*.log
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OCR model caches
+.paddleocr/
+*.tar
+*.params
+
+# Local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads
+backend/uploads/
+backend/tmp/
+backend/.venv/

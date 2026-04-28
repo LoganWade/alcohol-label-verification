@@ -1,0 +1,112 @@
+[
+  {
+    "id": "clean_match",
+    "title": "Clean match",
+    "description": "All standard fields match exactly. High-contrast label with correct Government Warning.",
+    "expected_outcome": "All fields Match",
+    "image_path": "labels/clean_match.png",
+    "expected_fields_path": "expected_fields/clean_match.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "case_only_brand",
+    "title": "Brand name — case only",
+    "description": "Brand is printed in mixed case; expected value is all-caps. Normalized comparison returns Match.",
+    "expected_outcome": "Brand Match (normalized), others Match",
+    "image_path": "labels/case_only_brand.png",
+    "expected_fields_path": "expected_fields/case_only_brand.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "typo_brand",
+    "title": "Brand name — single typo",
+    "description": "Brand has an extra character ('WINEERY'). Fuzzy match score falls in the Needs Review range.",
+    "expected_outcome": "Brand Needs Review",
+    "image_path": "labels/typo_brand.png",
+    "expected_fields_path": "expected_fields/typo_brand.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "abv_mismatch",
+    "title": "ABV mismatch",
+    "description": "Label shows 14.5% ABV but the application expects 13.5%. Structured-field comparison returns Mismatch.",
+    "expected_outcome": "ABV Mismatch, others Match",
+    "image_path": "labels/abv_mismatch.png",
+    "expected_fields_path": "expected_fields/abv_mismatch.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "warning_titlecase",
+    "title": "Government Warning — title-case header",
+    "description": "Warning header reads 'Government Warning:' instead of the required 'GOVERNMENT WARNING:'. Dedicated validator returns Mismatch.",
+    "expected_outcome": "Warning Mismatch",
+    "image_path": "labels/warning_titlecase.png",
+    "expected_fields_path": "expected_fields/warning_titlecase.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "warning_missing",
+    "title": "Government Warning — missing",
+    "description": "No Government Warning statement appears on the label. Validator returns Missing.",
+    "expected_outcome": "Warning Missing",
+    "image_path": "labels/warning_missing.png",
+    "expected_fields_path": "expected_fields/warning_missing.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "skewed_lowlight",
+    "title": "Skewed / poorly lit photo",
+    "description": "Clean-match content rendered with rotation, contrast reduction, blur, and noise. OCR confidence propagates as Needs Review or Uncertain for several fields.",
+    "expected_outcome": "Several fields Needs Review or Uncertain",
+    "image_path": "labels/skewed_lowlight.png",
+    "expected_fields_path": "expected_fields/skewed_lowlight.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "unreadable",
+    "title": "Unreadable image",
+    "description": "Nearly-black image. The preprocessing stage classifies it as FAILED and all fields return Uncertain.",
+    "expected_outcome": "All fields Uncertain",
+    "image_path": "labels/unreadable.png",
+    "expected_fields_path": "expected_fields/unreadable.json",
+    "provenance": "synthetic",
+    "source_url": null
+  },
+  {
+    "id": "ttb_wine_reference",
+    "title": "TTB reference — Merlot wine label",
+    "description": "Sample standard one-piece wine brand label from the TTB Wine Beverage Alcohol Manual (Ch. 10). ABC WINES / AMERICAN MERLOT. ALC. 15.5% BY VOL.",
+    "expected_outcome": "Pipeline runs and returns a structured result",
+    "image_path": "labels/ttb_wine_reference.png",
+    "expected_fields_path": "expected_fields/ttb_wine_reference.json",
+    "provenance": "public_ttb_reference",
+    "source_url": "https://www.ttb.gov/system/files/images/pdfs/wine_bam/c10-sample-wine-labels.pdf"
+  },
+  {
+    "id": "ttb_table_wine_reference",
+    "title": "TTB reference — Table wine label",
+    "description": "Sample table wine brand label from the TTB Wine Beverage Alcohol Manual (Ch. 10). XYZ WINERY / RED TABLE WINE. ABV not required for 7–14% table wine (27 CFR 4.36(a)).",
+    "expected_outcome": "Pipeline runs and returns a structured result",
+    "image_path": "labels/ttb_table_wine_reference.png",
+    "expected_fields_path": "expected_fields/ttb_table_wine_reference.json",
+    "provenance": "public_ttb_reference",
+    "source_url": "https://www.ttb.gov/system/files/images/pdfs/wine_bam/c10-sample-wine-labels.pdf"
+  },
+  {
+    "id": "ttb_beer_reference",
+    "title": "TTB reference — Beer front label",
+    "description": "Front label example from the TTB Boot Camp for Brewers: Labeling presentation (slide 19). 'Example' / Golden Ale / Fake Brewery Name. Warning is on the back label (not in this crop).",
+    "expected_outcome": "Pipeline runs and returns a structured result",
+    "image_path": "labels/ttb_beer_reference.png",
+    "expected_fields_path": "expected_fields/ttb_beer_reference.json",
+    "provenance": "public_ttb_reference",
+    "source_url": "https://www.ttb.gov/images/pdfs/TTB_Boot_Camp_for_Brewers-_Labeling.pdf"
+  }
+]
