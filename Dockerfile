@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libsm6 \
     libxext6 \
     libxrender1 \
+    libgomp1 \
     ccache \
     && rm -rf /var/lib/apt/lists/*
 
