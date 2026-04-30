@@ -78,6 +78,10 @@ export function BoundingBoxPreview({
           alt=""
           aria-hidden="true"
           className="hidden"
+          // Stable hook for tests that need to fire onLoad with mocked
+          // natural dimensions. Querying by Tailwind class couples tests
+          // to styling; a data-testid is the right contract.
+          data-testid="bbox-preview-loader"
           onLoad={(e) => {
             const img = e.currentTarget;
             setNatural({
