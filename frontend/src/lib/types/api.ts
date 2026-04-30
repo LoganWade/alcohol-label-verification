@@ -31,7 +31,11 @@ export type FieldName =
   | "country_of_origin"
   | "warning";
 
-export const FIELD_DISPLAY_ORDER: FieldName[] = [
+// Excludes "warning" because the government warning has its own dedicated
+// renderer (WarningValidation) and is not part of the field-by-field grid.
+// Typing this as Exclude<FieldName, "warning">[] makes that contract a
+// compile-time invariant rather than a hidden assumption.
+export const FIELD_DISPLAY_ORDER: Exclude<FieldName, "warning">[] = [
   "brand_name",
   "class_type",
   "alcohol_content",

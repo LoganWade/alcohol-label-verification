@@ -116,5 +116,9 @@ GOVERNMENT_WARNING_HEADER = "GOVERNMENT WARNING"
 # ---------------------------------------------------------------------------
 # Pipeline budgets (advisory; surfaced in processing metadata)
 # ---------------------------------------------------------------------------
+# The frontend owns its own "long running" threshold (see
+# frontend/src/features/review/ProcessingSection.tsx — LONG_RUNNING_MS) so
+# the UI can update its progress hint without a round-trip. There's no
+# backend consumer for a separate threshold; if one is ever added, define
+# it here rather than re-introducing dead code.
 TARGET_TOTAL_MS = 5000
-LONG_RUNNING_THRESHOLD_MS = 8000

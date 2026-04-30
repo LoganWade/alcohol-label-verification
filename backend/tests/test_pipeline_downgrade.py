@@ -104,7 +104,7 @@ class TestDowngradeAffectsComparisonStatus:
             extracted=ext_before,
         )
         # Sanity: pre-downgrade, MEDIUM-confidence exact match should be MATCH.
-        assert cmp_before.status is FieldStatus.MATCH
+        assert cmp_before.status == FieldStatus.MATCH
         assert cmp_before.confidence is Confidence.MEDIUM
 
         # Now simulate POOR quality: downgrade extracted, then re-compare.
@@ -115,6 +115,6 @@ class TestDowngradeAffectsComparisonStatus:
             extracted=downgraded.brand_name,
         )
         # Post-downgrade, the comparator sees LOW confidence and demotes.
-        assert cmp_after.status is FieldStatus.NEEDS_REVIEW
+        assert cmp_after.status == FieldStatus.NEEDS_REVIEW
         assert cmp_after.confidence is Confidence.LOW
         assert "low" in cmp_after.reason.lower()

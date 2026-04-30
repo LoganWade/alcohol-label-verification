@@ -164,6 +164,7 @@ export function ExpectedFieldsForm({
           <TextField
             label="Class / type"
             placeholder="e.g. Kentucky Straight Bourbon Whiskey"
+            optional
             value={value.class_type ?? ""}
             onChange={(e) => update("class_type", e.target.value || null)}
             data-testid="input-class_type"
@@ -179,6 +180,7 @@ export function ExpectedFieldsForm({
           <TextField
             label="Net contents"
             placeholder="e.g. 750 mL"
+            optional
             value={value.net_contents ?? ""}
             onChange={(e) => update("net_contents", e.target.value || null)}
             data-testid="input-net_contents"
@@ -186,6 +188,7 @@ export function ExpectedFieldsForm({
           <TextField
             label="Bottler / producer"
             placeholder="e.g. Bottled by Old Tom Co., Frankfort, KY"
+            optional
             value={value.bottler ?? ""}
             onChange={(e) => update("bottler", e.target.value || null)}
             data-testid="input-bottler"

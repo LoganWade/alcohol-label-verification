@@ -35,7 +35,11 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
-from app.core.constants import WorkflowStatus
+from app.core.constants import (
+    ApplicationProcessingStatus,
+    ImageAttribution,
+    WorkflowStatus,
+)
 from app.core.settings import settings
 from app.schemas.batch import (
     Application,
@@ -341,15 +345,13 @@ async def create_batch(
 
 def _resolve_attribution(
     apps: tuple[ManifestApplication, ...], filename: str
-) -> ImageAttribution:  # noqa: F821 - forward reference for clarity
+) -> ImageAttribution:
     """Look up the attribution for an image filename across all apps."""
 
     for app in apps:
         if filename in app.attributions_by_filename:
             return app.attributions_by_filename[filename]
     # Should be unreachable: caller verifies expected_filenames coverage.
-    from app.core.constants import ImageAttribution
-
     return ImageAttribution.OTHER
 
 
@@ -526,10 +528,13 @@ async def bulk_approve(batch_id: str) -> BulkApproveResponse:
         "needs_review": 0,
     }
     for app in detail.applications:
-        if app.processing_status.value == "processing" or app.processing_status.value == "pending":
+        if app.processing_status in (
+            ApplicationProcessingStatus.PROCESSING,
+            ApplicationProcessingStatus.PENDING,
+        ):
             skipped_reasons["still_processing"] += 1
             continue
-        if app.processing_status.value == "failed":
+        if app.processing_status == ApplicationProcessingStatus.FAILED:
             skipped_reasons["failed"] += 1
             continue
         if app.workflow_status != WorkflowStatus.PENDING_REVIEW:

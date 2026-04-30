@@ -156,6 +156,8 @@ The upstream PaddlePaddle C++ predictor (`paddle::AnalysisPredictor::ZeroCopyRun
 
 If this prototype ever ran on a beefier instance, the right move is the upstream-recommended one: a small worker pool with one `PaddleOCR` instance per worker process (not thread). That removes the lock and unlocks true parallelism, but requires multiple workers' worth of RAM.
 
+**Implication for batch processing:** the batch worker (`backend/app/services/batch/processor.py`) inherits this serialization. A 100-application batch with one OCR call per primary image means up to 100 OCR invocations queued behind the same process-wide lock, each running sequentially at ~2-4 s on the free tier. This is acceptable for the demo (a 100-row batch takes a few minutes) and the queue UI surfaces per-application progress so reviewers see forward motion. On a multi-worker deployment the lock would no longer be the bottleneck — at that point the batch processor should be reworked to dispatch OCR jobs across workers instead of running inside the API process.
+
 ### Sample-outcomes test gating
 `backend/tests/test_sample_outcomes.py` exercises the end-to-end pipeline against the eleven seeded sample scenarios, but the strongest assertions (per-field expected status, governance-warning sub-codes) are gated behind the `real_ocr` pytest marker because the default test run uses the stub OCR provider. Under the stub, the test only asserts that the analysis completes and returns a structurally valid `AnalyzeResponse`. Real-OCR-gated assertions are deferred to a CI job with PaddleOCR weights cached; tracked in the roadmap.
 

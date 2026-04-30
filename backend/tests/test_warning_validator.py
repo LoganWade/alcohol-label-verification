@@ -32,7 +32,7 @@ def _warning_field(
 class TestMatch:
     def test_correct_warning_matches(self):
         result = validate_warning(_warning_field(DEFAULT_GOVERNMENT_WARNING))
-        assert result.status is FieldStatus.MATCH
+        assert result.status == FieldStatus.MATCH
         assert result.header_caps_ok is True
         assert result.wording_match is True
 
@@ -49,7 +49,7 @@ class TestHeaderCapsRule:
             "may cause health problems."
         )
         result = validate_warning(_warning_field(text))
-        assert result.status is FieldStatus.MISMATCH
+        assert result.status == FieldStatus.MISMATCH
         assert result.header_caps_ok is False
         # Wording itself is correct; only the header format failed.
         assert result.wording_match is True
@@ -63,7 +63,7 @@ class TestWordingMismatch:
             "should be careful when operating heavy machinery."
         )
         result = validate_warning(_warning_field(text))
-        assert result.status is FieldStatus.MISMATCH
+        assert result.status == FieldStatus.MISMATCH
         assert result.header_caps_ok is True
         assert result.wording_match is False
 
@@ -71,7 +71,7 @@ class TestWordingMismatch:
 class TestMissing:
     def test_missing_warning_text(self):
         result = validate_warning(_warning_field(None, confidence=Confidence.UNCERTAIN))
-        assert result.status is FieldStatus.MISSING
+        assert result.status == FieldStatus.MISSING
         assert result.header_caps_ok is False
         assert result.wording_match is False
 
@@ -81,7 +81,7 @@ class TestUncertain:
         result = validate_warning(
             _warning_field(DEFAULT_GOVERNMENT_WARNING, confidence=Confidence.LOW)
         )
-        assert result.status is FieldStatus.UNCERTAIN
+        assert result.status == FieldStatus.UNCERTAIN
         assert "confidence" in result.reason.lower()
 
 
@@ -89,4 +89,4 @@ class TestCustomExpectedText:
     def test_custom_expected_text_is_honored(self):
         custom = "GOVERNMENT WARNING: please drink responsibly."
         result = validate_warning(_warning_field(custom), expected_text=custom)
-        assert result.status is FieldStatus.MATCH
+        assert result.status == FieldStatus.MATCH

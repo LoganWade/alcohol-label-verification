@@ -35,7 +35,7 @@ class TestStoneThrowCase:
             expected="Stone's Throw",
             extracted=_extracted("STONE'S THROW"),
         )
-        assert result.status is FieldStatus.MATCH
+        assert result.status == FieldStatus.MATCH
         assert "normaliz" in result.reason.lower()
 
     def test_curly_apostrophe(self):
@@ -44,7 +44,7 @@ class TestStoneThrowCase:
             expected="Stone's Throw",
             extracted=_extracted("Stone\u2019s Throw"),
         )
-        assert result.status is FieldStatus.MATCH
+        assert result.status == FieldStatus.MATCH
 
 
 class TestExactMatch:
@@ -54,7 +54,7 @@ class TestExactMatch:
             expected="Old Tom Distillery",
             extracted=_extracted("Old Tom Distillery"),
         )
-        assert result.status is FieldStatus.MATCH
+        assert result.status == FieldStatus.MATCH
         assert result.reason == "Exact match."
 
 
@@ -68,7 +68,7 @@ class TestFuzzyTiers:
         )
         # token_set_ratio for one-character typo on a long string is in the
         # 95+ band; this should be a Match with a similarity note.
-        assert result.status is FieldStatus.MATCH
+        assert result.status == FieldStatus.MATCH
         assert "similarity" in result.reason.lower()
 
     def test_partial_similarity_is_needs_review(self):
@@ -79,7 +79,7 @@ class TestFuzzyTiers:
             expected="Old Tom Distillery",
             extracted=_extracted("Old Tom Distilleries"),
         )
-        assert result.status is FieldStatus.NEEDS_REVIEW
+        assert result.status == FieldStatus.NEEDS_REVIEW
 
     def test_low_similarity_is_mismatch(self):
         result = compare_field(
@@ -87,7 +87,7 @@ class TestFuzzyTiers:
             expected="Old Tom Distillery",
             extracted=_extracted("Acme Soft Drinks"),
         )
-        assert result.status is FieldStatus.MISMATCH
+        assert result.status == FieldStatus.MISMATCH
 
     def test_clearly_different_brand_is_mismatch(self):
         # "Old Tom Brewery" vs "Old Tom Distillery" scores ~67 - below the
@@ -98,7 +98,7 @@ class TestFuzzyTiers:
             expected="Old Tom Distillery",
             extracted=_extracted("Old Tom Brewery"),
         )
-        assert result.status is FieldStatus.MISMATCH
+        assert result.status == FieldStatus.MISMATCH
 
 
 class TestConfidencePropagation:
@@ -108,7 +108,7 @@ class TestConfidencePropagation:
             expected="Old Tom Distillery",
             extracted=_extracted("Old Tom Distillery", confidence=Confidence.LOW),
         )
-        assert result.status is FieldStatus.NEEDS_REVIEW
+        assert result.status == FieldStatus.NEEDS_REVIEW
         assert "low" in result.reason.lower()
 
     def test_uncertain_confidence_downgrades_match(self):
@@ -117,7 +117,7 @@ class TestConfidencePropagation:
             expected="Old Tom Distillery",
             extracted=_extracted("Old Tom Distillery", confidence=Confidence.UNCERTAIN),
         )
-        assert result.status is FieldStatus.NEEDS_REVIEW
+        assert result.status == FieldStatus.NEEDS_REVIEW
 
 
 class TestMissingAndAbsent:
@@ -127,7 +127,7 @@ class TestMissingAndAbsent:
             expected="Old Tom Co., Frankfort, KY",
             extracted=_extracted(None, confidence=Confidence.UNCERTAIN),
         )
-        assert result.status is FieldStatus.MISSING
+        assert result.status == FieldStatus.MISSING
 
     def test_no_expected_value_with_extracted_text(self):
         result = compare_field(
@@ -136,7 +136,7 @@ class TestMissingAndAbsent:
             extracted=_extracted("USA"),
         )
         # Reviewer-driven: nothing to compare against, surface for review.
-        assert result.status is FieldStatus.NEEDS_REVIEW
+        assert result.status == FieldStatus.NEEDS_REVIEW
 
     def test_no_expected_value_and_no_extracted(self):
         result = compare_field(
@@ -144,7 +144,7 @@ class TestMissingAndAbsent:
             expected=None,
             extracted=_extracted(None, confidence=Confidence.UNCERTAIN),
         )
-        assert result.status is FieldStatus.MISSING
+        assert result.status == FieldStatus.MISSING
 
     def test_empty_string_expected_treated_as_unsupplied(self):
         """Frontend forms send '' for blank optional fields; treat as None.
@@ -161,7 +161,7 @@ class TestMissingAndAbsent:
         )
         # Behaves the same as expected=None: NEEDS_REVIEW because something
         # was extracted but no expected value was supplied to compare against.
-        assert result.status is FieldStatus.NEEDS_REVIEW
+        assert result.status == FieldStatus.NEEDS_REVIEW
         assert result.expected is None
 
     def test_whitespace_only_expected_treated_as_unsupplied(self):
@@ -170,5 +170,5 @@ class TestMissingAndAbsent:
             expected="   \t  ",
             extracted=_extracted(None, confidence=Confidence.UNCERTAIN),
         )
-        assert result.status is FieldStatus.MISSING
+        assert result.status == FieldStatus.MISSING
         assert result.expected is None

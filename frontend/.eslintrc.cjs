@@ -24,6 +24,8 @@ module.exports = {
       "error",
       { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
     ],
-    "@typescript-eslint/no-explicit-any": "warn",
+    // The codebase is `any`-free today; promote to error so a regression
+    // fails CI rather than landing as a warning nobody reads.
+    "@typescript-eslint/no-explicit-any": "error",
   },
 };

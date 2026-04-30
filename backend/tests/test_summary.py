@@ -23,8 +23,8 @@ def _comp(field: FieldName, status: FieldStatus) -> FieldComparison:
 def _warning(status: FieldStatus) -> WarningValidation:
     return WarningValidation(
         status=status,
-        header_caps_ok=status is FieldStatus.MATCH,
-        wording_match=status is FieldStatus.MATCH,
+        header_caps_ok=status == FieldStatus.MATCH,
+        wording_match=status == FieldStatus.MATCH,
         raw_text="x",
         expected_text="x",
         reason="",
@@ -36,7 +36,7 @@ class TestSummary:
         comparisons = [_comp(FieldName.BRAND_NAME, FieldStatus.MATCH)]
         warning = _warning(FieldStatus.MATCH)
         summary = build_summary(comparisons, warning)
-        assert summary.status is ReviewStatus.PASS
+        assert summary.status == ReviewStatus.PASS
 
     def test_any_mismatch_is_mismatch(self):
         comparisons = [
@@ -45,13 +45,13 @@ class TestSummary:
         ]
         warning = _warning(FieldStatus.MATCH)
         summary = build_summary(comparisons, warning)
-        assert summary.status is ReviewStatus.MISMATCH
+        assert summary.status == ReviewStatus.MISMATCH
 
     def test_warning_mismatch_dominates_passing_fields(self):
         comparisons = [_comp(FieldName.BRAND_NAME, FieldStatus.MATCH)]
         warning = _warning(FieldStatus.MISMATCH)
         summary = build_summary(comparisons, warning)
-        assert summary.status is ReviewStatus.MISMATCH
+        assert summary.status == ReviewStatus.MISMATCH
 
     def test_needs_review_only_is_needs_review(self):
         comparisons = [
@@ -60,10 +60,10 @@ class TestSummary:
         ]
         warning = _warning(FieldStatus.MATCH)
         summary = build_summary(comparisons, warning)
-        assert summary.status is ReviewStatus.NEEDS_REVIEW
+        assert summary.status == ReviewStatus.NEEDS_REVIEW
 
     def test_uncertain_warning_is_needs_review(self):
         comparisons = [_comp(FieldName.BRAND_NAME, FieldStatus.MATCH)]
         warning = _warning(FieldStatus.UNCERTAIN)
         summary = build_summary(comparisons, warning)
-        assert summary.status is ReviewStatus.NEEDS_REVIEW
+        assert summary.status == ReviewStatus.NEEDS_REVIEW
