@@ -6,15 +6,21 @@
  * stubbing `naturalWidth` / `naturalHeight` and firing the load event.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import { BoundingBoxPreview } from "./BoundingBoxPreview";
 import type { BoundingBox } from "@/lib/types/api";
 
 const BBOX: BoundingBox = { x0: 100, y0: 200, x1: 400, y1: 280 };
 
 function setNaturalSizeAndFireLoad(width: number, height: number) {
-  const img = document.querySelector("img.hidden") as HTMLImageElement | null;
-  if (!img) throw new Error("hidden loader <img> not found");
+  // Look up by data-testid rather than Tailwind class so the test stays
+  // honest about the contract — BoundingBoxPreview can restyle freely.
+  const img = screen.getByTestId("bbox-preview-loader") as HTMLImageElement;
   Object.defineProperty(img, "naturalWidth", { configurable: true, value: width });
   Object.defineProperty(img, "naturalHeight", { configurable: true, value: height });
   fireEvent.load(img);
@@ -109,7 +115,7 @@ describe("<BoundingBoxPreview>", () => {
         imageAlt="label region"
       />,
     );
-    const img = document.querySelector("img.hidden") as HTMLImageElement;
+    const img = screen.getByTestId("bbox-preview-loader") as HTMLImageElement;
     fireEvent.error(img);
     await waitFor(() =>
       expect(screen.getByTestId("bbox-preview-error")).toBeInTheDocument(),

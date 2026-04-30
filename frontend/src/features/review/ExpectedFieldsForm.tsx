@@ -1,6 +1,7 @@
 import { useState, useId } from "react";
 import { ClipboardPaste, ListChecks, Sparkles } from "lucide-react";
 import type { ExpectedFields } from "@/lib/types/api";
+import { EMPTY_EXPECTED_FIELDS } from "@/lib/types/api";
 import { TextField, TextArea } from "@/components/Field";
 import { Button } from "@/components/Button";
 import {
@@ -19,20 +20,6 @@ interface Props {
   /** When true, pre-load the stub sample on mount (from ?sample=1). */
   initialMode?: Mode;
 }
-
-// All-null EMPTY: blank optional fields ship as null on the wire so the
-// backend's compare_field treats them as "not supplied" rather than
-// comparing against an empty string. Required fields are still null when
-// blank — `expectedFieldsAreReady` enforces non-empty values before submit.
-const EMPTY: ExpectedFields = {
-  brand_name: null,
-  class_type: null,
-  alcohol_content: null,
-  net_contents: null,
-  bottler: null,
-  country_of_origin: null,
-  warning: null,
-};
 
 export function ExpectedFieldsForm({
   value,
@@ -63,7 +50,7 @@ export function ExpectedFieldsForm({
     }
     try {
       const parsed = JSON.parse(text);
-      const next: ExpectedFields = { ...EMPTY, ...parsed };
+      const next: ExpectedFields = { ...EMPTY_EXPECTED_FIELDS, ...parsed };
       onChange(next);
       setJsonError(undefined);
     } catch (e) {

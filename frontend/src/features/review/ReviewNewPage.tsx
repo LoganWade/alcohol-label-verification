@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { AnalyzeError, AnalyzeResponse, ExpectedFields } from "@/lib/types/api";
+import { EMPTY_EXPECTED_FIELDS } from "@/lib/types/api";
 import { analyzeLabel, AnalyzeApiError } from "@/lib/api/client";
 import { getSampleExpectedFields, getSampleImageUrl } from "@/lib/api/samples";
 import { STUB_SAMPLE_EXPECTED_FIELDS } from "@/lib/sample";
@@ -14,19 +15,6 @@ import { ProcessingSection } from "@/features/review/ProcessingSection";
 import { ErrorPanel } from "@/components/ErrorPanel";
 
 type Step = "fields" | "upload" | "processing";
-
-// All-null EMPTY: blank fields ship as null on the wire so the backend
-// treats them as "not supplied" rather than empty-string mismatches.
-// `expectedFieldsAreReady` enforces non-empty required fields before submit.
-const EMPTY: ExpectedFields = {
-  brand_name: null,
-  class_type: null,
-  alcohol_content: null,
-  net_contents: null,
-  bottler: null,
-  country_of_origin: null,
-  warning: null,
-};
 
 /**
  * Determine the initial ExpectedFields value.
@@ -41,7 +29,18 @@ const EMPTY: ExpectedFields = {
 function initialExpected(sampleParam: string | null): ExpectedFields {
   if (sampleParam === "1") return { ...STUB_SAMPLE_EXPECTED_FIELDS };
   // For any other id we start with EMPTY and let the useQuery below replace it.
-  return EMPTY;
+  return { ...EMPTY_EXPECTED_FIELDS };
+}
+
+/**
+ * Determine the initial Step. The legacy ?sample=1 path arrives with fields
+ * already populated, so we skip directly to "upload". Folding this into the
+ * lazy useState initializer means we don't need a run-once effect with an
+ * empty deps array — a hook-deps eslint disable is a small smell that's
+ * easy to design out.
+ */
+function initialStep(sampleParam: string | null): Step {
+  return sampleParam === "1" ? "upload" : "fields";
 }
 
 export function ReviewNewPage() {
@@ -56,7 +55,7 @@ export function ReviewNewPage() {
     initialExpected(sampleId),
   );
   const [file, setFile] = useState<File | null>(null);
-  const [step, setStep] = useState<Step>("fields");
+  const [step, setStep] = useState<Step>(() => initialStep(sampleId));
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<AnalyzeError | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | undefined>();
@@ -79,14 +78,6 @@ export function ReviewNewPage() {
       setStep("upload");
     }
   }, [sampleFieldsLoaded, sampleFields]);
-
-  // Legacy path: ?sample=1 also advances to upload step
-  useEffect(() => {
-    if (sampleId === "1") {
-      setStep("upload");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // -------------------------------------------------------------------------
   // For named samples, pre-set the file to the sample image so the reviewer
