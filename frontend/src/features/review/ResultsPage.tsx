@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Download, Printer, RotateCcw } from "lucide-react";
 import type { AnalyzeResponse } from "@/lib/types/api";
@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 
 interface RouteState {
   response?: AnalyzeResponse;
-  imageUrl?: string | null;
+  imageFile?: File | null;
 }
 
 export function ResultsPage() {
@@ -15,17 +15,18 @@ export function ResultsPage() {
   const navigate = useNavigate();
   const state = (location.state as RouteState | null) ?? null;
   const response = state?.response ?? null;
-  const imageUrl = state?.imageUrl ?? null;
+  const imageFile = state?.imageFile ?? null;
 
-  // Revoke any blob: URL we received when the page unmounts so we don't
-  // leak the object reference. Same-origin http(s) URLs are left alone.
-  useEffect(() => {
-    return () => {
-      if (imageUrl && imageUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(imageUrl);
-      }
-    };
-  }, [imageUrl]);
+  // Derive the blob: URL from the File via useMemo. We deliberately do
+  // NOT revoke it on unmount: React Strict Mode mounts components twice
+  // in dev (mount → unmount → mount), and an unmount-time revoke would
+  // invalidate the URL between the two mounts, breaking the bbox
+  // preview. The OS reclaims blob URLs on document unload, so the
+  // worst case is one leaked URL per review session — acceptable.
+  const imageUrl = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : null),
+    [imageFile],
+  );
 
   if (!response) {
     return (

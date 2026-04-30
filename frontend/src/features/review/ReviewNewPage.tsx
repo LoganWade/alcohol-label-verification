@@ -137,12 +137,12 @@ export function ReviewNewPage() {
       });
     },
     onSuccess: (data) => {
-      // Pass an object URL alongside the response so the results page
-      // can render the bounding-box crop preview. The URL is revoked
-      // by ResultsPage when it unmounts.
-      const imageUrl = file ? URL.createObjectURL(file) : null;
+      // Pass the File itself via route state. ResultsPage owns creation
+      // (and revocation) of the blob: URL; doing it here would let
+      // React Strict Mode's dev double-mount revoke the URL between
+      // the two mounts, breaking the bbox preview.
       navigate(`/review/${data.review_id}`, {
-        state: { response: data, imageUrl },
+        state: { response: data, imageFile: file },
       });
     },
     onError: (err) => {
