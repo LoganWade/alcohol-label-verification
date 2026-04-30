@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -24,8 +24,6 @@ import { listSamples, listBatchSamples } from "@/lib/api/samples";
  * the primary CTA; the sample sections are secondary and labelled clearly.
  */
 export function HomePage() {
-  const navigate = useNavigate();
-
   const { data: samples = [], isLoading: samplesLoading } = useQuery<
     SampleSummary[]
   >({
@@ -141,22 +139,10 @@ export function HomePage() {
                 data-testid="sample-group-synthetic"
               >
                 {synthetic.map((sample) => (
-                  <SampleCard
-                    key={sample.id}
-                    sample={sample}
-                    onClick={() =>
-                      navigate(`/review/new?sample=${sample.id}`)
-                    }
-                  />
+                  <SampleCard key={sample.id} sample={sample} />
                 ))}
                 {syntheticBatch.map((sample) => (
-                  <BatchSampleCard
-                    key={sample.id}
-                    sample={sample}
-                    onClick={() =>
-                      navigate(`/batches/new?sample=${sample.id}`)
-                    }
-                  />
+                  <BatchSampleCard key={sample.id} sample={sample} />
                 ))}
               </div>
             </section>
@@ -183,13 +169,7 @@ export function HomePage() {
                 data-testid="sample-group-ttb"
               >
                 {ttbRef.map((sample) => (
-                  <SampleCard
-                    key={sample.id}
-                    sample={sample}
-                    onClick={() =>
-                      navigate(`/review/new?sample=${sample.id}`)
-                    }
-                  />
+                  <SampleCard key={sample.id} sample={sample} />
                 ))}
               </div>
             </section>
@@ -229,14 +209,15 @@ export function HomePage() {
 
 interface SampleCardProps {
   sample: SampleSummary;
-  onClick: () => void;
 }
 
-function SampleCard({ sample, onClick }: SampleCardProps) {
+// Rendered as <Link>, not <button>, so middle-click, ctrl/⌘-click, right-click
+// “Open in new tab”, and “Copy link address” all work the way users expect.
+// The other home-page cards are already <Link>s; this keeps them consistent.
+function SampleCard({ sample }: SampleCardProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      to={`/review/new?sample=${sample.id}`}
       className="card p-u-3 text-left hover:border-primary hover:shadow-sm transition-all flex flex-col gap-u-1 group"
       data-testid={`link-try-sample-${sample.id}`}
     >
@@ -247,7 +228,7 @@ function SampleCard({ sample, onClick }: SampleCardProps) {
       <span className="mt-auto inline-flex items-center gap-1 text-primary text-sm font-medium group-hover:underline">
         Load sample <ArrowRight size={14} aria-hidden="true" />
       </span>
-    </button>
+    </Link>
   );
 }
 
@@ -257,15 +238,15 @@ function SampleCard({ sample, onClick }: SampleCardProps) {
 
 interface BatchSampleCardProps {
   sample: BatchSampleSummary;
-  onClick: () => void;
 }
 
-function BatchSampleCard({ sample, onClick }: BatchSampleCardProps) {
+// Same rationale as SampleCard — a navigating control should be a link, not
+// a button, so the browser's native open-in-new-tab affordances work.
+function BatchSampleCard({ sample }: BatchSampleCardProps) {
   const appCount = sample.image_filenames.length;
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      to={`/batches/new?sample=${sample.id}`}
       className="card p-u-3 text-left hover:border-primary hover:shadow-sm transition-all flex flex-col gap-u-1 group"
       data-testid={`link-try-batch-sample-${sample.id}`}
     >
@@ -281,6 +262,6 @@ function BatchSampleCard({ sample, onClick }: BatchSampleCardProps) {
       <span className="mt-auto inline-flex items-center gap-1 text-primary text-sm font-medium group-hover:underline">
         Load batch sample <ArrowRight size={14} aria-hidden="true" />
       </span>
-    </button>
+    </Link>
   );
 }
