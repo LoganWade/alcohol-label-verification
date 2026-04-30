@@ -171,6 +171,11 @@ export function ReviewNewPage() {
     setError(null);
     setStartedAt(Date.now());
     setStep("processing");
+    // Progress indicator renders at the top of the page; make sure the user
+    // actually sees it (Run button can be far below the fold on small screens).
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     mutation.mutate();
   };
 
@@ -184,6 +189,16 @@ export function ReviewNewPage() {
   return (
     <div className="max-w-3xl mx-auto px-u-3 py-u-4 space-y-u-3">
       <h1 className="text-2xl font-semibold">New review</h1>
+
+      {/*
+       * Processing indicator is rendered at the TOP of the page (above the
+       * form) so progress is always visible without scrolling. The Run button
+       * lives at the bottom of Step 2, which is below the fold on small
+       * laptops — placing the indicator there hides it from the user.
+       */}
+      {step === "processing" && startedAt !== null && (
+        <ProcessingSection startedAt={startedAt} onCancel={handleCancel} />
+      )}
 
       {error && (
         <ErrorPanel error={error} onRetry={() => setError(null)} />
@@ -203,10 +218,6 @@ export function ReviewNewPage() {
           disabled={step === "processing"}
           warning={uploadWarning}
         />
-      )}
-
-      {step === "processing" && startedAt !== null && (
-        <ProcessingSection startedAt={startedAt} onCancel={handleCancel} />
       )}
     </div>
   );
