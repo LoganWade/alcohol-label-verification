@@ -1,12 +1,23 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, FileText, Image as ImageIcon, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  Image as ImageIcon,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { BatchApiError, createBatch } from "@/lib/api/batches";
+import {
+  fetchBatchSampleImage,
+  fetchBatchSampleManifest,
+  listBatchSamples,
+} from "@/lib/api/samples";
 import type { ManifestError } from "@/lib/types/api";
 
 /**
@@ -27,12 +38,64 @@ import type { ManifestError } from "@/lib/types/api";
  */
 export function BatchUploadPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sampleId = searchParams.get("sample");
+
   const [importerName, setImporterName] = useState("");
   const [importerEmail, setImporterEmail] = useState("");
   const [note, setNote] = useState("");
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [manifestErrors, setManifestErrors] = useState<ManifestError[]>([]);
+  const [samplePrefilled, setSamplePrefilled] = useState<string | null>(null);
+  const [samplePrefillError, setSamplePrefillError] = useState<string | null>(
+    null,
+  );
+
+  // Pre-fill the form from a synthetic batch sample when ?sample=<id>
+  // is present. We fetch metadata, manifest CSV, and every referenced
+  // image once on mount and treat the result as if the user had picked
+  // them by hand.
+  useEffect(() => {
+    if (!sampleId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await listBatchSamples();
+        const sample = all.find((s) => s.id === sampleId);
+        if (!sample) {
+          if (!cancelled)
+            setSamplePrefillError(
+              `No batch sample with id "${sampleId}" exists.`,
+            );
+          return;
+        }
+        const [manifest, ...images] = await Promise.all([
+          fetchBatchSampleManifest(sample.id),
+          ...sample.image_filenames.map((f) =>
+            fetchBatchSampleImage(sample.id, f),
+          ),
+        ]);
+        if (cancelled) return;
+        setImporterName(sample.importer_name);
+        setImporterEmail(sample.importer_email);
+        setNote(sample.note ?? "");
+        setManifestFile(manifest);
+        setImageFiles(images);
+        setSamplePrefilled(sample.title);
+      } catch (err) {
+        if (!cancelled)
+          setSamplePrefillError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load the synthetic batch.",
+          );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sampleId]);
 
   const totalImageBytes = useMemo(
     () => imageFiles.reduce((acc, f) => acc + f.size, 0),
@@ -102,6 +165,32 @@ export function BatchUploadPage() {
         will review the batch in the order you submit it; clean matches can be
         approved in bulk once processing finishes.
       </p>
+
+      {samplePrefilled && (
+        <div
+          className="mt-u-3 card p-u-2 border-primary bg-status-match-bg flex items-start gap-u-2"
+          data-testid="sample-prefilled-banner"
+        >
+          <Sparkles
+            size={20}
+            aria-hidden="true"
+            className="text-primary mt-0.5 shrink-0"
+          />
+          <div className="text-sm text-ink-700">
+            <strong>Synthetic batch loaded:</strong> {samplePrefilled}. The
+            importer fields, manifest, and images are pre-filled — review and
+            click <em>Submit batch</em> to send it through.
+          </div>
+        </div>
+      )}
+      {samplePrefillError && (
+        <div
+          className="mt-u-3 card p-u-2 border-status-mismatch-border bg-status-mismatch-bg text-sm text-status-mismatch-text"
+          data-testid="sample-prefilled-error"
+        >
+          Couldn't load the synthetic batch: {samplePrefillError}
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {

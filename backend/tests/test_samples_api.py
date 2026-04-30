@@ -174,3 +174,82 @@ class TestSampleExpectedFields:
         res = client.get("/api/v1/samples/no_such/expected-fields")
         body = res.json()
         assert body["detail"]["code"] == "sample_not_found"
+
+
+# ---------------------------------------------------------------------------
+# Batch sample endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestBatchSamples:
+    """GET /api/v1/samples/batch (and its sub-endpoints)."""
+
+    def test_list_returns_at_least_one_entry(self, client):
+        res = client.get("/api/v1/samples/batch")
+        assert res.status_code == 200
+        body = res.json()
+        assert isinstance(body, list)
+        assert len(body) >= 1
+
+    def test_list_entry_shape(self, client):
+        body = client.get("/api/v1/samples/batch").json()
+        entry = body[0]
+        for key in (
+            "id",
+            "title",
+            "description",
+            "expected_outcome",
+            "provenance",
+            "importer_name",
+            "importer_email",
+            "image_filenames",
+        ):
+            assert key in entry, f"missing key: {key}"
+        assert isinstance(entry["image_filenames"], list)
+        assert len(entry["image_filenames"]) > 0
+
+    def test_demo_batch_lists_expected_filenames(self, client):
+        body = client.get("/api/v1/samples/batch").json()
+        demo = next(e for e in body if e["id"] == "batch_demo")
+        assert set(demo["image_filenames"]) == {
+            "clean_match.png",
+            "case_only_brand.png",
+            "abv_mismatch.png",
+            "warning_titlecase.png",
+        }
+
+    def test_manifest_returns_csv(self, client):
+        res = client.get("/api/v1/samples/batch/batch_demo/manifest")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("text/csv")
+        first_line = res.content.splitlines()[0].decode("utf-8-sig")
+        assert "serial_number" in first_line
+        assert "image_filename" in first_line
+
+    def test_image_returns_png(self, client):
+        res = client.get(
+            "/api/v1/samples/batch/batch_demo/image/clean_match.png"
+        )
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("image/png")
+        assert len(res.content) > 0
+
+    def test_image_404_for_unknown_filename(self, client):
+        res = client.get(
+            "/api/v1/samples/batch/batch_demo/image/does_not_exist.png"
+        )
+        assert res.status_code == 404
+        assert res.json()["detail"]["code"] == "batch_sample_image_missing"
+
+    def test_unknown_batch_returns_404(self, client):
+        res = client.get("/api/v1/samples/batch/no_such/manifest")
+        assert res.status_code == 404
+        assert res.json()["detail"]["code"] == "batch_sample_not_found"
+
+    def test_path_traversal_blocked_by_router(self, client):
+        # FastAPI strips path traversal at the routing layer — the request
+        # either 404s on an unmatched route or 400s on our explicit guard.
+        res = client.get(
+            "/api/v1/samples/batch/batch_demo/image/..%2Fmanifest.csv"
+        )
+        assert res.status_code in (400, 404)

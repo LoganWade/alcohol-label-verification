@@ -1,0 +1,14 @@
+[
+  {
+    "id": "batch_demo",
+    "title": "Importer batch \u2014 4 applications",
+    "description": "Four-application batch covering the headline scenarios: clean match, case-only brand, ABV mismatch, and a title-case Government Warning header.",
+    "expected_outcome": "2 bulk-approved (clean match + case-only), 2 routed to analyst review (ABV + warning header)",
+    "provenance": "synthetic",
+    "importer_name": "Stone's Throw Imports (demo)",
+    "importer_email": "demo@stonesthrow.example",
+    "note": "Four-app sample batch generated from sample_data/batch_demo. Re-run the demo flow end-to-end with a single click.",
+    "manifest_path": "batch_demo/manifest.csv",
+    "images_dir": "batch_demo"
+  }
+]

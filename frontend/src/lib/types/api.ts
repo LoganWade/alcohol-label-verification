@@ -275,3 +275,16 @@ export interface SampleSummary {
   expected_outcome: string;
   provenance: SampleProvenance;
 }
+
+/** Batch-upload demo descriptor returned by GET /api/v1/samples/batch. */
+export interface BatchSampleSummary {
+  id: string;
+  title: string;
+  description: string;
+  expected_outcome: string;
+  provenance: SampleProvenance;
+  importer_name: string;
+  importer_email: string;
+  note: string | null;
+  image_filenames: string[];
+}
