@@ -10,7 +10,11 @@
  * callers can use a single error boundary.
  */
 
-import type { ExpectedFields, SampleSummary } from "@/lib/types/api";
+import type {
+  BatchSampleSummary,
+  ExpectedFields,
+  SampleSummary,
+} from "@/lib/types/api";
 import { API_BASE_URL, AnalyzeApiError } from "@/lib/api/client";
 
 // ---------------------------------------------------------------------------
@@ -68,4 +72,46 @@ export async function getSampleExpectedFields(
     `${API_BASE_URL}/samples/${encodeURIComponent(sampleId)}/expected-fields`,
   );
   return _handleResponse<ExpectedFields>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Batch samples
+// ---------------------------------------------------------------------------
+
+/** Fetch the full list of batch-upload demos. */
+export async function listBatchSamples(): Promise<BatchSampleSummary[]> {
+  const res = await fetch(`${API_BASE_URL}/samples/batch`);
+  return _handleResponse<BatchSampleSummary[]>(res);
+}
+
+/**
+ * Fetch a batch sample's manifest CSV as a File ready for FormData.
+ * Used by BatchUploadPage to pre-fill the importer form.
+ */
+export async function fetchBatchSampleManifest(
+  sampleId: string,
+): Promise<File> {
+  const res = await fetch(
+    `${API_BASE_URL}/samples/batch/${encodeURIComponent(sampleId)}/manifest`,
+  );
+  if (!res.ok) {
+    return _handleResponse(res);
+  }
+  const blob = await res.blob();
+  return new File([blob], "manifest.csv", { type: "text/csv" });
+}
+
+/** Fetch a batch sample image as a File ready for FormData. */
+export async function fetchBatchSampleImage(
+  sampleId: string,
+  filename: string,
+): Promise<File> {
+  const res = await fetch(
+    `${API_BASE_URL}/samples/batch/${encodeURIComponent(sampleId)}/image/${encodeURIComponent(filename)}`,
+  );
+  if (!res.ok) {
+    return _handleResponse(res);
+  }
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type || "image/png" });
 }

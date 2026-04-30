@@ -54,6 +54,22 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     )
 
+    # Batch-upload SQLite database path. Defaults to /tmp on container
+    # filesystems (HF Spaces) and to a workspace-local path during dev.
+    # The directory must exist; the file is created on first connection.
+    # Set ALV_BATCH_DB_PATH=/path/to/db.sqlite in production.
+    batch_db_path: str = "/tmp/alv_batches.db"
+
+    # Hard cap on applications in a single batch submission. Soft warning
+    # is emitted by the frontend at half this number. See
+    # docs/tradeoffs.md "Cap on batch size" for rationale.
+    batch_max_applications: int = 100
+
+    # Storage root for uploaded batch images. Files are written under
+    # <batch_storage_dir>/<batch_id>/<filename>. Defaults to /tmp on HF
+    # Spaces. The directory is created on first batch submission.
+    batch_storage_dir: str = "/tmp/alv_batch_uploads"
+
     # Static files directory for serving the built React frontend.
     # When set, FastAPI mounts the directory at "/" with html=True so
     # React Router client-side routes work correctly.

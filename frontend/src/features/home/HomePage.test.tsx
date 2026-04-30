@@ -10,19 +10,21 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { HomePage } from "./HomePage";
-import type { SampleSummary } from "@/lib/types/api";
+import type { SampleSummary, BatchSampleSummary } from "@/lib/types/api";
 
 // ---------------------------------------------------------------------------
 // Mock the samples API module
 // ---------------------------------------------------------------------------
 vi.mock("@/lib/api/samples", () => ({
   listSamples: vi.fn(),
+  listBatchSamples: vi.fn(),
   getSampleImageUrl: (id: string) => `/api/v1/samples/${id}/image`,
   getSampleExpectedFields: vi.fn(),
 }));
 
-import { listSamples } from "@/lib/api/samples";
+import { listSamples, listBatchSamples } from "@/lib/api/samples";
 const mockListSamples = vi.mocked(listSamples);
+const mockListBatchSamples = vi.mocked(listBatchSamples);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -63,6 +65,26 @@ const TTB_SAMPLES: SampleSummary[] = [
 
 const ALL_SAMPLES = [...SYNTHETIC_SAMPLES, ...TTB_SAMPLES];
 
+const BATCH_SAMPLES: BatchSampleSummary[] = [
+  {
+    id: "batch_demo",
+    title: "Importer batch — 4 applications",
+    description: "Four-application batch covering the headline scenarios.",
+    expected_outcome:
+      "2 bulk-approved (clean match + case-only), 2 routed to analyst review",
+    provenance: "synthetic",
+    importer_name: "Stone's Throw Imports (demo)",
+    importer_email: "demo@stonesthrow.example",
+    note: null,
+    image_filenames: [
+      "clean_match.png",
+      "case_only_brand.png",
+      "abv_mismatch.png",
+      "warning_titlecase.png",
+    ],
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Render helper
 // ---------------------------------------------------------------------------
@@ -85,6 +107,8 @@ function renderHomePage() {
 describe("<HomePage>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: no batch samples. Tests that need them override per-test.
+    mockListBatchSamples.mockResolvedValue([]);
   });
 
   it("renders the primary start-review link", () => {
@@ -175,7 +199,38 @@ describe("<HomePage>", () => {
   it("shows a loading state while samples are fetching", () => {
     // Make the query hang indefinitely
     mockListSamples.mockReturnValue(new Promise(() => {}));
+    mockListBatchSamples.mockReturnValue(new Promise(() => {}));
     renderHomePage();
     expect(screen.getByLabelText(/Loading samples/i)).toBeInTheDocument();
+  });
+
+  it("renders a batch sample card inside the synthetic group", async () => {
+    mockListSamples.mockResolvedValue(SYNTHETIC_SAMPLES);
+    mockListBatchSamples.mockResolvedValue(BATCH_SAMPLES);
+    renderHomePage();
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("link-try-batch-sample-batch_demo"),
+      ).toBeInTheDocument();
+    });
+    // The batch card should live inside the synthetic grid container
+    const syntheticGroup = screen.getByTestId("sample-group-synthetic");
+    expect(
+      syntheticGroup.querySelector(
+        '[data-testid="link-try-batch-sample-batch_demo"]',
+      ),
+    ).not.toBeNull();
+  });
+
+  it("renders the synthetic section when only batch samples exist", async () => {
+    mockListSamples.mockResolvedValue([]);
+    mockListBatchSamples.mockResolvedValue(BATCH_SAMPLES);
+    renderHomePage();
+    await waitFor(() => {
+      expect(screen.getByTestId("sample-group-synthetic")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("link-try-batch-sample-batch_demo"),
+      ).toBeInTheDocument();
+    });
   });
 });

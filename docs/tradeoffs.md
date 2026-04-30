@@ -44,6 +44,57 @@ This document records the deliberate choices made during the build, what was def
 **Cost:** Minor friction when tuning.
 **Mitigation:** Worth it for the audit story.
 
+## Batch upload (feature/batch-upload)
+
+The `feature/batch-upload` branch adds an importer-side bulk submission flow and an analyst queue, motivated by Janet (Seattle) and the recurring "big importers dump 200-300 applications on us at once" pain point.
+
+### Use-case framing: applications, not images
+The TTB workflow groups label *images* (front, back, neck, body) into a single COLA *application* with structured fields (Brand Name, Fanciful Name, Net Contents, Alcohol Content, Vintage, etc.). Importers file *applications* in bulk; analysts review *applications* one at a time. "Batch upload" therefore means **N applications submitted in one batch**, not "N images for one application." The latter already works through the existing single-analyze flow.
+
+This framing is what justifies the new `Batch` and `Application` data model below. A simpler "upload N images and run them all" feature would not have moved Janet's needle: she still needs to track which images belong to which application, what the importer claimed about each one, and which she has approved.
+
+### Data model: SQLite (not Postgres, not in-memory)
+**Why:** Persistence is non-negotiable — an analyst's bulk-approve action and individual approvals must survive a page refresh and a server restart. SQLite is in the Python stdlib, ships zero ops surface, and runs fine on the HF Spaces ephemeral disk. Postgres would mean a managed-database dependency we cannot justify on free-tier infrastructure for a prototype.
+**Cost:** SQLite is single-writer; concurrent batch submissions serialize at the DB layer. The HF Spaces disk is ephemeral, so the database is wiped on container restart — not a problem for a demo, fatal for production.
+**Mitigation:** A `BATCH_DB_PATH` environment variable points at the database file, defaulting to `/tmp/alv_batches.db` on HF Spaces. The schema lives in one `migrations.py` module so an upgrade to Postgres later is a single-file change. The deferred review-history feature (already in the roadmap) shares this storage, so this is not net-new accidental complexity.
+
+### Manifest format: CSV, not JSON
+**Why:** An importer's compliance team is far more likely to be able to produce CSV out of their existing systems (Excel exports, internal databases, AS/400 reports) than hand-write JSON. Mirroring TTB Step-2 column names (`brand_name`, `fanciful_name`, `net_contents`, `alcohol_content`, `vintage`, `varietals`, `appellation`, `serial_number`, `image_filename`) keeps the cognitive load on the importer's end at zero.
+**Cost:** CSV has no nested types, so multi-image-per-application is encoded as multiple rows with the same `serial_number` rather than a JSON array of filenames. We accept this for the prototype.
+**Mitigation:** Manifest validation surfaces structured errors in the same `AnalyzeError` envelope shape used by `/analyze`, so the frontend can render line-and-column feedback the importer can act on.
+
+### One image per application gets OCR’d in Phase A
+**Why:** TTB allows up to 10 images per application (front, back, neck, body, etc.). Running the full pipeline on every image in a 300-application batch on a free-tier 2-vCPU runtime, with the PaddleOCR thread-safety lock that serializes inference, would mean ~3000 OCR calls behind one lock. At ~2 s per call that is ~100 minutes wall-clock for one batch — not a viable demo.
+
+The importer designates a `primary_image_filename` per application (defaulting to the first image when unspecified). Only the primary image goes through OCR + comparison. Secondary images are stored and shown in the application detail view but not pre-screened.
+**Cost:** A real analyst on real labels still wants pre-screening signals on the back-label warning text and the neck-label vintage. We are skipping that.
+**Mitigation:** The data model already stores N images per application with attribution types (`front` | `back` | `neck` | `body` | `other`), so wiring the pipeline to additional images later is a config change, not a schema change. Documented in `docs/roadmap.md` as "Phase B: per-image-type pipeline routing."
+
+### Background processing: FastAPI BackgroundTasks, not Celery
+**Why:** Celery would mean a Redis broker we cannot run on HF Spaces free tier. FastAPI's built-in `BackgroundTasks` with `asyncio.to_thread` already gets us off the request thread and onto the existing PaddleOCR-locked worker pool. Combined with the SQLite job-status row (`pending` → `processing` → `done` | `failed` per application) the analyst gets a real progress signal.
+**Cost:** No retry-with-backoff, no horizontal scale, no dead-letter queue. A batch submitted just before a container restart is lost.
+**Mitigation:** The processor is idempotent: re-running on a `pending` application reuses cached OCR results when present. The roadmap captures "Celery + Redis" as the production-grade upgrade path. For a take-home demo with 11 sample labels, the in-process path is honest.
+
+### Bulk-approve clean matches: limited to high-confidence Match-only applications
+**Why:** The whole point of pre-screening is that an analyst can disposition the obvious ones in a single click, then spend their attention on the ones that actually need a human. We need a sharp, defensible definition of "obvious": **every** field comparison must be `Match` AND **every** field confidence must be `high`. Anything less and the application stays in the queue for individual review.
+**Cost:** This is conservative — a `Match` at `medium` confidence will not be auto-approved, even though a real analyst would have approved it. We choose false negatives (more manual review) over false positives (silent auto-approval of a real defect).
+**Mitigation:** The bulk-approve action is logged with the exact field-status snapshot at the moment of approval, so an audit can reconstruct what was approved and on what evidence. The threshold (`Match` + `high` only) lives in `core/constants.py` as `BULK_APPROVE_REQUIRES_CONFIDENCE` so it is a one-line tuning change if we ever want to relax it.
+
+### No real auth or multi-tenancy
+**Why:** Out of scope for a take-home prototype. We capture the importer's name and a contact email on the batch as plain text fields. Anyone with the URL can submit batches and see the queue.
+**Cost:** Obviously not deployable to a real TTB environment without auth.
+**Mitigation:** The `Batch` model already has an `importer_name` and `importer_email` column. Adding real authentication is a single-layer add (e.g. FastAPI dependency that resolves a session to a tenant-scoped DB query); it does not require schema changes.
+
+### Workflow status vocabulary
+Applications carry a separate `workflow_status` enum (`pending_review` | `approved` | `rejected` | `needs_correction`) layered on top of the existing `ReviewStatus` from the analysis result. The two are deliberately distinct:
+- `ReviewStatus` (analysis result, immutable) reflects what the pipeline found: `Pass` / `Mismatch` / `Needs Review`.
+- `workflow_status` (analyst decision, mutable) reflects what the human did about it.
+
+This separation is what lets the bulk-approve action work cleanly: it changes `workflow_status` from `pending_review` to `approved` for applications whose `ReviewStatus` is `Pass` and whose every field is high-confidence Match. The two statuses never collapse into one ambiguous "approved" string.
+
+### Cap on batch size
+We cap a single batch at **100 applications** for the prototype. With one OCR call per application at ~2 s on the free tier, a full 100-app batch is ~3.5 minutes wall-clock. The 200-300 number from Janet's quote is honestly outside what one HF Space free-tier instance should be expected to absorb in a single submission — the right answer for that scale is a worker pool, which is in the roadmap. The cap is enforced at the manifest validator and surfaced in the upload UI as a soft warning at 50, hard stop at 100.
+
 ## What was deferred
 
 These items were considered and explicitly cut for the time box. Each is structured so it can be added without rearchitecting.

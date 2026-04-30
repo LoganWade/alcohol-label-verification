@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,8 +12,19 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import health, reviews, samples
+from app.api import batches, health, reviews, samples
 from app.core.settings import settings
+from app.services.batch.storage import get_store
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Initialize the batch SQLite store (creates the DB file on first run
+    # and applies any pending migrations). Idempotent; safe on every
+    # startup. Doing this in the lifespan handler means the first
+    # request never pays the migration cost or sees a missing-table error.
+    get_store()
+    yield
 
 
 def create_app() -> FastAPI:
@@ -23,13 +36,14 @@ def create_app() -> FastAPI:
             "Returns deterministic, evidence-backed comparisons; never "
             "issues approve/reject decisions."
         ),
+        lifespan=_lifespan,
     )
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
         allow_headers=["*"],
     )
 
@@ -38,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix=settings.api_v1_prefix)
     app.include_router(reviews.router, prefix=settings.api_v1_prefix)
     app.include_router(samples.router, prefix=settings.api_v1_prefix)
+    app.include_router(batches.router, prefix=settings.api_v1_prefix)
 
     # Production: serve the built React frontend as static files.
     #

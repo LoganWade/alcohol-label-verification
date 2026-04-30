@@ -49,6 +49,37 @@ class ImageQuality(StrEnum):
 
 
 # ---------------------------------------------------------------------------
+# Batch / application workflow vocabulary
+# ---------------------------------------------------------------------------
+# Application processing state — lifecycle of the OCR pipeline run for one
+# application within a batch. Independent of the analyst's decision.
+class ApplicationProcessingStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    DONE = "done"
+    FAILED = "failed"
+
+
+# Analyst-facing workflow status — what the human did about the application.
+# Layered on top of the analysis result's ReviewStatus, never collapsed.
+# See docs/tradeoffs.md "Workflow status vocabulary".
+class WorkflowStatus(StrEnum):
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    NEEDS_CORRECTION = "needs_correction"
+
+
+# Image attribution within an application (TTB Step 3 of 3 attachment types).
+class ImageAttribution(StrEnum):
+    FRONT = "front"
+    BACK = "back"
+    NECK = "neck"
+    BODY = "body"
+    OTHER = "other"
+
+
+# ---------------------------------------------------------------------------
 # Comparison thresholds
 # ---------------------------------------------------------------------------
 # rapidfuzz token_set_ratio thresholds (0-100). Tunable here, nowhere else.
@@ -58,6 +89,11 @@ FUZZY_NEEDS_REVIEW_THRESHOLD = 85
 # OCR token confidence (0.0-1.0) below which we propagate uncertainty by
 # downgrading a Match to Needs Review.
 LOW_CONFIDENCE_DOWNGRADE_THRESHOLD = 0.60
+
+# Minimum per-field confidence required for an application to be eligible
+# for bulk-approve. See docs/tradeoffs.md "Bulk-approve clean matches".
+# Conservative by design: medium-confidence Matches still require a human.
+BULK_APPROVE_REQUIRES_CONFIDENCE: tuple[Confidence, ...] = (Confidence.HIGH,)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,5 @@
+serial_number,brand_name,fanciful_name,class_type,alcohol_content,net_contents,bottler,country_of_origin,image_filename,attribution,is_primary
+TTB-DEMO-001,STONE'S THROW WINERY,,Cabernet Sauvignon,13.5% Alc./Vol.,750 mL,"Bottled by Stone's Throw Winery, Napa, CA",,clean_match.png,front,true
+TTB-DEMO-002,STONE'S THROW WINERY,,Cabernet Sauvignon,13.5% Alc./Vol.,750 mL,"Bottled by Stone's Throw Winery, Napa, CA",,case_only_brand.png,front,true
+TTB-DEMO-003,STONE'S THROW WINERY,,Cabernet Sauvignon,13.5% Alc./Vol.,750 mL,"Bottled by Stone's Throw Winery, Napa, CA",,abv_mismatch.png,front,true
+TTB-DEMO-004,STONE'S THROW WINERY,,Cabernet Sauvignon,13.5% Alc./Vol.,750 mL,"Bottled by Stone's Throw Winery, Napa, CA",,warning_titlecase.png,front,true

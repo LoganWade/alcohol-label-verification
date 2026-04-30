@@ -29,6 +29,8 @@ Three constraints shaped every technical choice, drawn from stakeholder intervie
 
 A FastAPI backend exposes a single `/api/v1/reviews/analyze` endpoint that runs a named, multi-stage extraction pipeline (preprocess → OCR → region attribution → field extraction → comparison → warning validation → reporting). OCR is local-only (PaddleOCR) so there are no outbound network dependencies — a hard requirement in federal environments. Comparison logic is fully deterministic, using Unicode normalization plus `rapidfuzz` for tiered matching, with a dedicated validator for the Government Warning. A React + Vite frontend presents a three-step linear flow (expected fields → upload → results) with side-by-side evidence, status chips, and per-field confidence. No LLM is used in the decision path; every result is inspectable and reproducible.
 
+A second flow on top of the same pipeline supports **batch upload**: importers submit a manifest CSV plus one image per application, the backend runs the same `analyze()` pipeline on every primary image in the background, and analysts work the resulting queue with one-click bulk approval for clean matches. Per-application drill-down reuses the same `ResultsView` component as the single-image flow, so analysts see identical evidence and rationale in both surfaces. Workflow decisions (`pending_review | approved | rejected | needs_correction`) are kept strictly separate from the pipeline's `Match | Mismatch | Missing | Needs Review | Uncertain` vocabulary.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md) — system design, pipeline stages, API contract, key decisions

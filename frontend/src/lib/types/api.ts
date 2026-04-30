@@ -154,6 +154,115 @@ export interface AnalyzeError {
   recovery_hint: string | null;
 }
 
+// ---- Batch upload types ------------------------------------------------
+//
+// Mirrors backend/app/schemas/batch.py + the ApplicationProcessingStatus,
+// WorkflowStatus, and ImageAttribution enums in core/constants.py.
+
+export type ApplicationProcessingStatus =
+  | "pending"
+  | "processing"
+  | "done"
+  | "failed";
+
+export type WorkflowStatus =
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "needs_correction";
+
+export type ImageAttribution = "front" | "back" | "neck" | "body" | "other";
+
+export interface LabelImage {
+  id: string;
+  filename: string;
+  attribution: ImageAttribution;
+  is_primary: boolean;
+  byte_size: number;
+  content_type: string;
+}
+
+export interface ApplicationFields {
+  serial_number: string;
+  brand_name: string | null;
+  fanciful_name: string | null;
+  class_type: string | null;
+  alcohol_content: string | null;
+  net_contents: string | null;
+  bottler: string | null;
+  country_of_origin: string | null;
+}
+
+export interface BatchApplication {
+  id: string;
+  batch_id: string;
+  fields: ApplicationFields;
+  processing_status: ApplicationProcessingStatus;
+  workflow_status: WorkflowStatus;
+  images: LabelImage[];
+  analyze: AnalyzeResponse | null;
+  error: AnalyzeError | null;
+  created_at: string;
+  processed_at: string | null;
+  decided_at: string | null;
+  decided_note: string | null;
+}
+
+export interface BatchSummaryCounts {
+  total: number;
+  pending: number;
+  processing: number;
+  done: number;
+  failed: number;
+  approved: number;
+  rejected: number;
+  needs_correction: number;
+}
+
+export interface Batch {
+  id: string;
+  importer_name: string;
+  importer_email: string;
+  note: string | null;
+  counts: BatchSummaryCounts;
+  created_at: string;
+}
+
+export interface BatchDetail extends Batch {
+  applications: BatchApplication[];
+}
+
+export interface BulkApproveResponse {
+  approved_count: number;
+  skipped_count: number;
+  skipped_reasons: Record<string, number>;
+}
+
+// One row of /batches errors. Row 0 = file-level problem.
+export interface ManifestError {
+  row_number: number;
+  column: string | null;
+  code: string;
+  message: string;
+}
+
+export const PROCESSING_STATUS_LABELS: Record<
+  ApplicationProcessingStatus,
+  string
+> = {
+  pending: "Queued",
+  processing: "Processing",
+  done: "Analyzed",
+  failed: "Failed",
+};
+
+export const WORKFLOW_STATUS_LABELS: Record<WorkflowStatus, string> = {
+  pending_review: "Pending review",
+  approved: "Approved",
+  rejected: "Rejected",
+  needs_correction: "Needs correction",
+};
+
 // ---- Demo / sample types ------------------------------------------------
 
 export type SampleProvenance = "synthetic" | "public_ttb_reference";
@@ -165,4 +274,17 @@ export interface SampleSummary {
   description: string;
   expected_outcome: string;
   provenance: SampleProvenance;
+}
+
+/** Batch-upload demo descriptor returned by GET /api/v1/samples/batch. */
+export interface BatchSampleSummary {
+  id: string;
+  title: string;
+  description: string;
+  expected_outcome: string;
+  provenance: SampleProvenance;
+  importer_name: string;
+  importer_email: string;
+  note: string | null;
+  image_filenames: string[];
 }
