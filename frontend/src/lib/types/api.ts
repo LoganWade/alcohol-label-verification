@@ -76,6 +76,21 @@ export interface ExpectedFields {
   warning: string | null;
 }
 
+// All-null ExpectedFields literal. Blank fields ship as null on the wire so
+// the backend treats them as "not supplied" rather than empty-string
+// mismatches; `expectedFieldsAreReady` enforces required fields before submit.
+// Single source of truth — import + spread to avoid sharing the same object
+// reference across components (pages and forms own their own copy).
+export const EMPTY_EXPECTED_FIELDS: ExpectedFields = {
+  brand_name: null,
+  class_type: null,
+  alcohol_content: null,
+  net_contents: null,
+  bottler: null,
+  country_of_origin: null,
+  warning: null,
+};
+
 // ---- Response shape ----------------------------------------------------
 
 export interface ExtractedField {
