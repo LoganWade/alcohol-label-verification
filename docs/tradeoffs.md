@@ -99,11 +99,13 @@ We cap a single batch at **100 applications** for the prototype. With one OCR ca
 
 These items were considered and explicitly cut for the time box. Each is structured so it can be added without rearchitecting.
 
-### Stretch features still in scope if time allows
-- **Batch upload + queue view.** Sarah and Janet's recurring pain point. The single-review pipeline is reusable; the missing pieces are an upload UI, a job queue, and a results table.
+### Stretch features that shipped
+- **Batch upload + analyst queue.** Sarah and Janet's recurring pain point. The full importer-side submission flow plus the analyst queue, bulk-approve, and per-application detail page are in. See the "Batch upload (feature/batch-upload)" section above for the design choices behind it.
+- **Seeded sample labels.** Eleven single-label samples (eight synthetic scenarios + three TTB reference labels) and one four-application importer batch sample, surfaced as `Load sample` cards on the home page. Documented in `docs/test-data.md`.
+
+### Stretch features still deferred
 - **Skew/glare/perspective correction.** Jenny's "labels photographed at weird angles" concern. The preprocess stage has the hook; the heavier OpenCV operations and tuning are the work.
-- **Review history (SQLite).** Useful for the demo. The data model is small; the work is mostly UI.
-- **Seeded sample labels and demo mode.** "Try with sample data" button on the home screen plus 5–6 seeded scenarios.
+- **Review history (SQLite-backed review IDs in the URL).** The single-label flow currently keeps results in React Router location state, which is dropped on hard refresh (see "ResultsPage hard-refresh loses analysis state" below). Persisting review payloads to SQLite is a bounded change once the schema is shared with the existing batch tables.
 
 ### Out of scope, intentionally
 - **Authentication, user roles, audit logging.** Federal-grade auth is months of work and out of scope for a prototype.

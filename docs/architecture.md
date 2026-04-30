@@ -57,7 +57,13 @@ The prototype is **not** a COLA integration, **not** an authoritative compliance
 │   │     summary, processing metadata, limitations                │   │
 │   └──────────────────────────────────────────────────────────────┘   │
 │                                                                      │
-│   SQLite (review history — stretch)                                  │
+│   Batch subsystem (POST /api/v1/batches → CSV manifest +             │
+│   N images → BackgroundTasks worker → analyst queue + bulk           │
+│   approve). Reuses the same pipeline above, one app at a time,       │
+│   serialized behind the process-wide PaddleOCR lock.                 │
+│                                                                      │
+│   SQLite — batch + application state, plus seeded sample             │
+│   manifests (synthetic + TTB reference labels).                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -193,20 +199,30 @@ Aggregates everything into the API response, computes the overall summary status
 ### `GET /api/v1/health`
 Liveness/readiness check. Includes OCR-model-loaded flag.
 
-### Optional (stretch)
-- `POST /api/v1/reviews/batch` — accepts a zip of images plus an expected-fields template; returns a batch ID.
-- `GET /api/v1/reviews/{id}` — recall a stored review.
+### Sample data
+- `GET /api/v1/samples/` — list synthetic + TTB reference samples.
+- `GET /api/v1/samples/{id}/image` — fetch the image bytes for a single-label sample.
+- `GET /api/v1/samples/{id}/expected-fields` — fetch the matching expected-fields JSON.
+- `GET /api/v1/samples/batch`, `GET /api/v1/samples/batch/{id}/manifest`, `GET /api/v1/samples/batch/{id}/image/{filename}` — same idea for the seeded importer batch.
+
+### Batch subsystem
+- `POST /api/v1/batches` — create a batch from a CSV manifest plus N image files (multipart). Capped at 100 applications per batch.
+- `GET /api/v1/batches`, `GET /api/v1/batches/{id}` — list batches and fetch one with its applications.
+- `GET /api/v1/applications/{id}` — single-application detail (reuses the same response shape as `/reviews/analyze`).
+- `GET /api/v1/applications/{id}/images/{image_id}` — fetch a stored application image.
+- `PUT /api/v1/applications/{id}/decision` — record an analyst decision (approve / reject / needs correction / reset to pending) plus optional note.
+- `POST /api/v1/batches/{id}/bulk-approve` — approve only the applications whose every field is `Match` at `high` confidence; returns approved + skipped counts with reasons.
 
 All schemas are Pydantic models exported to OpenAPI at `/docs`.
 
 ## 6. Frontend architecture
 
 - **Stack:** React 18 + Vite + TypeScript, Tailwind for styling with USWDS-aligned tokens.
-- **Routing:** four routes — `/`, `/review/new`, `/review/:id`, `/history` (stretch).
-- **State:** local component state plus React Query for the analyze call. No global store needed.
-- **Feature folder:** `src/features/review/` owns the upload, expected-fields form, processing screen, and results view.
+- **Routing:** seven routes — `/` (home), `/review/new`, `/review/:id`, `/batches/new`, `/queue`, `/queue/applications/:id`, and a `*` not-found fallback.
+- **State:** local component state plus React Query for the analyze call and the queue polling. No global store needed.
+- **Feature folders:** `src/features/review/` owns the single-label upload, expected-fields form, processing screen, and results view; `src/features/batch/` owns importer submission; `src/features/queue/` owns the analyst queue and per-application detail. The `ResultsView` component is shared between the single-label flow and the queue detail page so the evidence-row UI stays identical.
 - **Status display:** a single `<StatusChip>` component takes a status from the fixed vocabulary and renders text + icon + color, never color alone.
-- **Accessibility:** axe-core on each route in CI; full keyboard nav; visible focus rings; status announcements via ARIA live regions on the processing and results screens.
+- **Accessibility:** full keyboard nav, visible focus rings, and status announcements via ARIA live regions on the processing and results screens. axe-core runs against the live DOM in development mode (wired in `src/main.tsx`) so violations surface in the browser console while iterating; there is no CI pipeline in this prototype, so axe-in-CI is on the roadmap rather than in place today.
 
 ## 7. Key decisions and the reasoning behind them
 

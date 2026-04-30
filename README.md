@@ -11,7 +11,9 @@ app_port: 7860
 
 AI-powered prototype that helps compliance reviewers verify whether information on an alcohol label matches expected application data and whether required label content is present. Built as a take-home project for an interview process.
 
-> **Status:** In development. Discovery and architecture docs are complete; backend and frontend implementation in progress.
+**Live demo:** https://huggingface.co/spaces/LoganWade/alcohol-label-verification
+
+The app is fully demoable from the home page — sample cards under "Synthetic test scenarios" and "TTB reference labels" load a prefilled scenario in one click. The first request may take 5–10 seconds while the OCR model warms up; subsequent runs are in the 3–4 second range. See [Demo script](docs/demo-script.md) for a guided walkthrough.
 
 ## Why this exists
 
@@ -36,7 +38,9 @@ A second flow on top of the same pipeline supports **batch upload**: importers s
 - [Architecture](docs/architecture.md) — system design, pipeline stages, API contract, key decisions
 - [Trade-offs](docs/tradeoffs.md) — what we chose, what we deferred, and why
 - [Test data](docs/test-data.md) — sample labels, provenance, and the test scenario matrix
-- [Demo script](docs/demo-script.md) — how to walk through the deployed app
+- [Demo script](docs/demo-script.md) — guided walkthrough of the deployed app
+- [Roadmap](docs/roadmap.md) — features identified from a TTB regulations review, tiered by lift
+- [Security](docs/security.md) — prototype-scoped security audit
 
 ## Repository layout
 
@@ -45,16 +49,48 @@ A second flow on top of the same pipeline supports **batch upload**: importers s
 ├── AGENTS.md              # Operating manual for coding agents on this project
 ├── Dockerfile             # Multi-stage build: Node 20 frontend + Python 3.11 backend
 ├── README.md
-├── docs/                  # Architecture, trade-offs, test data, demo script
+├── docs/                  # Architecture, trade-offs, test data, demo script, roadmap, security
 ├── frontend/              # React + Vite + TypeScript UI
 ├── backend/               # FastAPI service + extraction/validation pipeline
-├── sample_data/           # Sample labels and paired expected-fields JSON
-└── scripts/               # Dev and deploy helpers
+├── sample_data/           # Sample labels, paired expected-fields JSON, batch demo manifest
+└── scripts/               # Sample-data generation (synthetic labels + TTB reference shrinking)
 ```
 
 ## Setup
 
-> Detailed setup instructions land alongside the first working build. Stack: Python 3.11 + FastAPI + PaddleOCR + OpenCV; Node 20 + React + Vite + TypeScript; Docker for deployment to Hugging Face Spaces.
+Stack: Python 3.11 + FastAPI + PaddleOCR + OpenCV; Node 20 + React + Vite + TypeScript; Docker for deployment to Hugging Face Spaces.
+
+### Backend
+
+```bash
+cd backend
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -e .[dev]
+# Run with the stub OCR provider (fast, no model download)
+ALV_OCR_PROVIDER=stub uvicorn app.main:app --reload --port 8000
+# Or with real PaddleOCR (first run downloads ~200 MB of weights)
+ALV_OCR_PROVIDER=paddle uvicorn app.main:app --reload --port 8000
+```
+
+Tests: `pytest -q -m "not real_ocr"` (the `real_ocr` marker gates assertions that require the live PaddleOCR provider).
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev    # http://localhost:5173, proxies /api to :8000
+npm test       # vitest + React Testing Library
+npm run build  # production bundle in dist/
+```
+
+### Full-stack via Docker
+
+```bash
+docker build -t alcohol-label-verification .
+docker run --rm -p 7860:7860 alcohol-label-verification
+# Open http://localhost:7860
+```
 
 ## Deployment (Hugging Face Spaces)
 
@@ -71,7 +107,7 @@ git remote add hf https://huggingface.co/spaces/<user>/<space-name>
 git push hf main
 ```
 
-After the build completes the app is live at `https://<user>-<space-name>.hf.space`.
+After the build completes the app is live at `https://<user>-<space-name>.hf.space` — for this project, https://loganwade-alcohol-label-verification.hf.space.
 
 ## Status & limitations
 
