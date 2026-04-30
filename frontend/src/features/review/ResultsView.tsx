@@ -84,10 +84,10 @@ function FieldRow({
             {FIELD_LABELS[fieldName]}
           </button>
         </td>
-        <td className="px-u-2 py-u-2 align-top text-sm">
+        <td className="px-u-2 py-u-2 align-top text-sm break-words">
           {comparison.expected ?? <span className="text-ink-400">—</span>}
         </td>
-        <td className="px-u-2 py-u-2 align-top text-sm font-mono">
+        <td className="px-u-2 py-u-2 align-top text-sm font-mono break-words">
           {comparison.found_raw ?? <span className="text-ink-400">—</span>}
         </td>
         <td className="px-u-2 py-u-2 align-top">
@@ -139,7 +139,7 @@ function FieldRow({
                   <h4 className="font-medium text-ink-700 text-xs uppercase tracking-wide mb-1">
                     Bounding box
                   </h4>
-                  <p className="font-mono text-xs text-ink-600">
+                  <p className="font-mono text-xs text-ink-600 break-words">
                     {fmtBbox(comparison.evidence_bbox)}
                   </p>
                   {comparison.evidence_bbox && imageUrl ? (
@@ -224,10 +224,10 @@ function WarningRow({
             )}
           </div>
         </td>
-        <td className="px-u-2 py-u-2 align-top text-sm text-ink-500">
+        <td className="px-u-2 py-u-2 align-top text-sm text-ink-500 break-words">
           Statutory text
         </td>
-        <td className="px-u-2 py-u-2 align-top text-sm font-mono">
+        <td className="px-u-2 py-u-2 align-top text-sm font-mono break-words">
           {validation.raw_text ? (
             <span className="line-clamp-3">{validation.raw_text}</span>
           ) : (
@@ -279,7 +279,7 @@ function WarningRow({
                   <h4 className="font-medium text-ink-700 text-xs uppercase tracking-wide mb-1">
                     Bounding box
                   </h4>
-                  <p className="font-mono text-xs text-ink-600">
+                  <p className="font-mono text-xs text-ink-600 break-words">
                     {fmtBbox(validation.evidence_bbox)}
                   </p>
                   {validation.evidence_bbox && imageUrl && (
@@ -345,10 +345,25 @@ export function ResultsView({ response, imageUrl }: Props) {
       </header>
 
       <div className="card overflow-hidden">
-        <table className="w-full text-left">
+        {/*
+         * table-fixed + explicit <colgroup> widths keep the columns from
+         * reflowing when an evidence row is expanded. With the default
+         * table-layout: auto, expanding a row introduces wide content (the
+         * comparison reason sentence, bbox coords) and the auto algorithm
+         * redistributes width across every other row — the "jitter". Fixed
+         * widths anchor the grid; long tokens wrap inside their own cell.
+         */}
+        <table className="w-full text-left table-fixed">
           <caption className="sr-only">
             Field-by-field comparison of expected and detected values.
           </caption>
+          <colgroup>
+            <col className="w-[22%]" />
+            <col className="w-[26%]" />
+            <col className="w-[26%]" />
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+          </colgroup>
           <thead className="bg-ink-50 text-xs uppercase tracking-wide text-ink-600">
             <tr>
               <th scope="col" className="px-u-2 py-u-1 font-medium">
