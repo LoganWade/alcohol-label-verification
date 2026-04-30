@@ -1,6 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Upload, Sparkles, FlaskConical, BookOpen } from "lucide-react";
+import {
+  ArrowRight,
+  Upload,
+  Sparkles,
+  FlaskConical,
+  BookOpen,
+  PackagePlus,
+  ClipboardList,
+} from "lucide-react";
 
 import type { SampleSummary } from "@/lib/types/api";
 import { listSamples } from "@/lib/api/samples";
@@ -54,6 +62,43 @@ export function HomePage() {
           </p>
           <span className="mt-auto inline-flex items-center gap-1 text-primary font-medium group-hover:underline">
             Begin <ArrowRight size={16} aria-hidden="true" />
+          </span>
+        </Link>
+      </div>
+
+      {/* ---- Batch upload secondary actions ---- */}
+      <div className="mt-u-3 grid gap-u-2 sm:grid-cols-2">
+        <Link
+          to="/batches/new"
+          className="card p-u-3 hover:border-primary hover:shadow-sm transition-all flex flex-col gap-u-1 group"
+          data-testid="link-batch-upload"
+        >
+          <PackagePlus size={24} aria-hidden="true" className="text-primary" />
+          <h2 className="text-base font-semibold">Submit a batch</h2>
+          <p className="text-sm text-ink-500">
+            Importer flow: upload a manifest CSV plus one image per
+            application.
+          </p>
+          <span className="mt-auto inline-flex items-center gap-1 text-primary text-sm font-medium group-hover:underline">
+            New batch <ArrowRight size={14} aria-hidden="true" />
+          </span>
+        </Link>
+        <Link
+          to="/queue"
+          className="card p-u-3 hover:border-primary hover:shadow-sm transition-all flex flex-col gap-u-1 group"
+          data-testid="link-analyst-queue"
+        >
+          <ClipboardList
+            size={24}
+            aria-hidden="true"
+            className="text-primary"
+          />
+          <h2 className="text-base font-semibold">Open analyst queue</h2>
+          <p className="text-sm text-ink-500">
+            Analyst flow: review batches and bulk-approve clean matches.
+          </p>
+          <span className="mt-auto inline-flex items-center gap-1 text-primary text-sm font-medium group-hover:underline">
+            View queue <ArrowRight size={14} aria-hidden="true" />
           </span>
         </Link>
       </div>
