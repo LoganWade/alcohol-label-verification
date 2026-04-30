@@ -374,3 +374,81 @@ def test_bulk_approve_returns_counts_and_skipped_reasons(
 def test_bulk_approve_404_for_unknown_batch(client: TestClient) -> None:
     r = client.post("/api/v1/batches/bat_nope/bulk-approve")
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /applications/{id}/images/{image_id}
+# ---------------------------------------------------------------------------
+def test_get_application_image_returns_png_bytes(client: TestClient) -> None:
+    """The image route returns the PNG bytes the importer uploaded."""
+
+    batch_id = _submit_simple_batch(client, serials=("A1",))
+    body = _wait_for_processing(client, batch_id)
+    app = body["applications"][0]
+    image = app["images"][0]
+    r = client.get(
+        f"/api/v1/applications/{app['id']}/images/{image['id']}"
+    )
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("image/png")
+    assert len(r.content) > 0
+    # PNG magic bytes
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_get_application_image_404_for_unknown_image(client: TestClient) -> None:
+    batch_id = _submit_simple_batch(client, serials=("A1",))
+    body = _wait_for_processing(client, batch_id)
+    app_id = body["applications"][0]["id"]
+    r = client.get(f"/api/v1/applications/{app_id}/images/img_does_not_exist")
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "image_not_found"
+
+
+def test_get_application_image_404_for_unknown_application(
+    client: TestClient,
+) -> None:
+    batch_id = _submit_simple_batch(client, serials=("A1",))
+    body = _wait_for_processing(client, batch_id)
+    image_id = body["applications"][0]["images"][0]["id"]
+    r = client.get(f"/api/v1/applications/app_unknown/images/{image_id}")
+    assert r.status_code == 404
+
+
+def test_get_application_image_rejects_cross_application_id(
+    client: TestClient,
+) -> None:
+    """Using one application's id with another application's image id
+    must 404 — the (application_id, image_id) pair is required to match.
+    """
+
+    batch_id = _submit_simple_batch(client, serials=("A1", "A2"))
+    body = _wait_for_processing(client, batch_id)
+    app_a, app_b = body["applications"][0], body["applications"][1]
+    # image belongs to app_a; request it under app_b's id
+    r = client.get(
+        f"/api/v1/applications/{app_b['id']}/images/{app_a['images'][0]['id']}"
+    )
+    assert r.status_code == 404
+
+
+def test_get_application_image_404_when_file_missing_on_disk(
+    client: TestClient,
+) -> None:
+    """If the DB row exists but the on-disk file is gone, return 404
+    instead of crashing."""
+
+    from app.core.settings import settings
+
+    batch_id = _submit_simple_batch(client, serials=("A1",))
+    body = _wait_for_processing(client, batch_id)
+    app = body["applications"][0]
+    # Delete the image bytes from disk
+    storage_root = Path(settings.batch_storage_dir)
+    for f in storage_root.rglob("A1.png"):
+        f.unlink()
+    r = client.get(
+        f"/api/v1/applications/{app['id']}/images/{app['images'][0]['id']}"
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "image_not_found"

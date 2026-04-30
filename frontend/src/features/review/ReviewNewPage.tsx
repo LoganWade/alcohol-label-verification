@@ -137,7 +137,13 @@ export function ReviewNewPage() {
       });
     },
     onSuccess: (data) => {
-      navigate(`/review/${data.review_id}`, { state: { response: data } });
+      // Pass the File itself via route state. ResultsPage owns creation
+      // (and revocation) of the blob: URL; doing it here would let
+      // React Strict Mode's dev double-mount revoke the URL between
+      // the two mounts, breaking the bbox preview.
+      navigate(`/review/${data.review_id}`, {
+        state: { response: data, imageFile: file },
+      });
     },
     onError: (err) => {
       // Ignore abort — the user clicked Cancel and we just bounce back.

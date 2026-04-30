@@ -10,9 +10,16 @@ import type {
 } from "@/lib/types/api";
 import { FIELD_LABELS, FIELD_DISPLAY_ORDER } from "@/lib/types/api";
 import { StatusChip } from "@/components/StatusChip";
+import { BoundingBoxPreview } from "@/features/review/BoundingBoxPreview";
 
 interface Props {
   response: AnalyzeResponse;
+  /**
+   * Optional URL of the label image. When present, every evidence panel
+   * with a bounding box also renders a cropped preview that highlights
+   * the matched region. Omit to fall back to coordinates-only display.
+   */
+  imageUrl?: string | null;
 }
 
 function fmtElapsed(ms: number): string {
@@ -42,6 +49,7 @@ interface RowProps {
   rawText: string | null;
   expanded: boolean;
   onToggle: () => void;
+  imageUrl?: string | null;
 }
 
 function FieldRow({
@@ -50,6 +58,7 @@ function FieldRow({
   rawText,
   expanded,
   onToggle,
+  imageUrl,
 }: RowProps) {
   const Chevron = expanded ? ChevronDown : ChevronRight;
   return (
@@ -133,9 +142,21 @@ function FieldRow({
                   <p className="font-mono text-xs text-ink-600">
                     {fmtBbox(comparison.evidence_bbox)}
                   </p>
-                  <p className="text-xs text-ink-400 italic">
-                    Image crop preview is planned for a future release.
-                  </p>
+                  {comparison.evidence_bbox && imageUrl ? (
+                    <div className="mt-u-1">
+                      <BoundingBoxPreview
+                        bbox={comparison.evidence_bbox}
+                        imageUrl={imageUrl}
+                        imageAlt={`Label region for ${FIELD_LABELS[fieldName]}`}
+                      />
+                    </div>
+                  ) : (
+                    !imageUrl && (
+                      <p className="text-xs text-ink-400 italic">
+                        Image preview unavailable for this review.
+                      </p>
+                    )
+                  )}
                 </div>
               </div>
             </div>
@@ -150,9 +171,15 @@ interface WarningRowProps {
   validation: WarningValidation;
   expanded: boolean;
   onToggle: () => void;
+  imageUrl?: string | null;
 }
 
-function WarningRow({ validation, expanded, onToggle }: WarningRowProps) {
+function WarningRow({
+  validation,
+  expanded,
+  onToggle,
+  imageUrl,
+}: WarningRowProps) {
   const Chevron = expanded ? ChevronDown : ChevronRight;
   const headerOk = validation.header_caps_ok;
   const wordingOk = validation.wording_match;
@@ -255,6 +282,15 @@ function WarningRow({ validation, expanded, onToggle }: WarningRowProps) {
                   <p className="font-mono text-xs text-ink-600">
                     {fmtBbox(validation.evidence_bbox)}
                   </p>
+                  {validation.evidence_bbox && imageUrl && (
+                    <div className="mt-u-1">
+                      <BoundingBoxPreview
+                        bbox={validation.evidence_bbox}
+                        imageUrl={imageUrl}
+                        imageAlt="Government warning region"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -265,7 +301,7 @@ function WarningRow({ validation, expanded, onToggle }: WarningRowProps) {
   );
 }
 
-export function ResultsView({ response }: Props) {
+export function ResultsView({ response, imageUrl }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
     setExpanded((prev) => {
@@ -346,6 +382,7 @@ export function ResultsView({ response }: Props) {
                   rawText={rawText}
                   expanded={expanded.has(fieldName)}
                   onToggle={() => toggle(fieldName)}
+                  imageUrl={imageUrl}
                 />
               );
             })}
@@ -353,6 +390,7 @@ export function ResultsView({ response }: Props) {
               validation={response.warning_validation}
               expanded={expanded.has("warning")}
               onToggle={() => toggle("warning")}
+              imageUrl={imageUrl}
             />
           </tbody>
         </table>
