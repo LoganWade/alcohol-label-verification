@@ -19,12 +19,10 @@ import sqlite3
 MIGRATIONS: tuple[tuple[int, str], ...] = (
     (
         1,
+        # Note: schema_migrations is created by apply() before any migration
+        # runs, so it must NOT be re-declared here. Earlier drafts duplicated
+        # it; keep this migration focused on the feature tables.
         """
-        CREATE TABLE IF NOT EXISTS schema_migrations (
-            version INTEGER PRIMARY KEY,
-            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-
         CREATE TABLE IF NOT EXISTS batches (
             id TEXT PRIMARY KEY,
             importer_name TEXT NOT NULL,

@@ -18,7 +18,11 @@ router = APIRouter()
 # cost (≈200 MB download + ~3 s model init), blowing past the 5 s budget.
 # Surface this in /health so reviewers can see the degraded state immediately
 # instead of finding out the hard way mid-demo.
-_PADDLE_PRELOAD_FAILED_SENTINEL = Path.home() / "app" / ".paddle_preload_failed"
+#
+# Path is taken from settings.paddle_preload_sentinel_path so the Dockerfile
+# location and the runtime check stay in sync via a single configurable knob
+# rather than two separately-hardcoded paths.
+_PADDLE_PRELOAD_FAILED_SENTINEL = Path(settings.paddle_preload_sentinel_path)
 
 
 class HealthResponse(BaseModel):

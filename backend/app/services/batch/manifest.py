@@ -276,28 +276,6 @@ def _coerce_row(
             )
         )
 
-    attribution_raw = _strip(raw.get("attribution")).lower()
-    attribution: ImageAttribution
-    if not attribution_raw:
-        # Default to FRONT only if is_primary is true; otherwise OTHER.
-        attribution = ImageAttribution.OTHER  # caller may override
-    else:
-        try:
-            attribution = ImageAttribution(attribution_raw)
-        except ValueError:
-            errs.append(
-                ManifestError(
-                    row_number=row_number,
-                    column="attribution",
-                    code="row_invalid_attribution",
-                    message=(
-                        f"attribution {attribution_raw!r} is not one of: "
-                        f"{', '.join(a.value for a in ImageAttribution)}."
-                    ),
-                )
-            )
-            attribution = ImageAttribution.OTHER
-
     is_primary_raw = _strip(raw.get("is_primary")).lower()
     is_primary: bool
     if is_primary_raw in _TRUE:
@@ -317,6 +295,33 @@ def _coerce_row(
             )
         )
         is_primary = False
+
+    attribution_raw = _strip(raw.get("attribution")).lower()
+    attribution: ImageAttribution
+    if not attribution_raw:
+        # When attribution is blank, infer from is_primary: a primary row is
+        # the front label by convention, while non-primary rows fall back to
+        # OTHER. This matches reviewer expectations and keeps single-image
+        # batches usable without forcing every operator to fill the column.
+        attribution = (
+            ImageAttribution.FRONT if is_primary else ImageAttribution.OTHER
+        )
+    else:
+        try:
+            attribution = ImageAttribution(attribution_raw)
+        except ValueError:
+            errs.append(
+                ManifestError(
+                    row_number=row_number,
+                    column="attribution",
+                    code="row_invalid_attribution",
+                    message=(
+                        f"attribution {attribution_raw!r} is not one of: "
+                        f"{', '.join(a.value for a in ImageAttribution)}."
+                    ),
+                )
+            )
+            attribution = ImageAttribution.OTHER
 
     fields: dict[str, str | None] = {}
     for col in _FIELD_COLUMNS:

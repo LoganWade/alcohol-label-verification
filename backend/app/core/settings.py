@@ -77,5 +77,13 @@ class Settings(BaseSettings):
     # Set ALV_STATIC_DIR=/home/user/app/frontend_dist in production.
     static_dir: str | None = None
 
+    # Sentinel file path written by the Dockerfile model-preload step when
+    # the preload fails (network unavailable, registry blocked, etc.). When
+    # present, /health surfaces a degraded flag so reviewers see the cold-
+    # start risk before the first analyze call. Default matches the path
+    # written in Dockerfile; override with ALV_PADDLE_PRELOAD_SENTINEL_PATH
+    # for non-default deploy layouts.
+    paddle_preload_sentinel_path: str = "/home/user/app/.paddle_preload_failed"
+
 
 settings = Settings()

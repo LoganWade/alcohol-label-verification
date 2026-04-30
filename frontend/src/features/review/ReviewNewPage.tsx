@@ -125,7 +125,11 @@ export function ReviewNewPage() {
   // -------------------------------------------------------------------------
   // Analyze mutation
   // -------------------------------------------------------------------------
-  const mutation = useMutation<AnalyzeResponse, unknown>({
+  // Typed as `AnalyzeApiError | Error`: analyzeLabel throws AnalyzeApiError
+  // for typed envelopes from the API, and bare Error (DOMException with
+  // name === "AbortError", or a synthetic "file missing" Error) for
+  // local/transport failures. Both are handled in onError below.
+  const mutation = useMutation<AnalyzeResponse, AnalyzeApiError | Error>({
     mutationFn: async () => {
       if (!file) throw new Error("file missing");
       const ctrl = new AbortController();
@@ -147,7 +151,7 @@ export function ReviewNewPage() {
     },
     onError: (err) => {
       // Ignore abort — the user clicked Cancel and we just bounce back.
-      if ((err as Error)?.name === "AbortError") {
+      if (err.name === "AbortError") {
         setStep("upload");
         setStartedAt(null);
         return;
@@ -157,7 +161,7 @@ export function ReviewNewPage() {
       } else {
         setError({
           code: "unknown_error",
-          message: (err as Error)?.message ?? "Unexpected error.",
+          message: err.message ?? "Unexpected error.",
           recovery_hint: "Try again. If the issue persists, contact support.",
         });
       }

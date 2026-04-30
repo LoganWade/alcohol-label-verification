@@ -47,6 +47,10 @@ export function BatchUploadPage() {
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [manifestErrors, setManifestErrors] = useState<ManifestError[]>([]);
+  // Surfaces the count of duplicate-by-filename images that the picker
+  // dropped on the most recent add. Cleared on the next successful add or
+  // a removal so it never lingers stale.
+  const [duplicateSkipNotice, setDuplicateSkipNotice] = useState<number>(0);
   const [samplePrefilled, setSamplePrefilled] = useState<string | null>(null);
   const [samplePrefillError, setSamplePrefillError] = useState<string | null>(
     null,
@@ -140,19 +144,28 @@ export function BatchUploadPage() {
   function onAddImages(files: FileList | null) {
     if (!files) return;
     // De-dupe by filename: the backend rejects duplicate image filenames.
+    // Silent dedupe is confusing ("I dropped 12 files but only 9 showed up"),
+    // so we count the skips and surface them as an inline notice. Importers
+    // can then check whether they intended to replace or whether their
+    // picker repeated entries.
     const seen = new Set(imageFiles.map((f) => f.name));
     const next = [...imageFiles];
+    let skipped = 0;
     for (const f of Array.from(files)) {
       if (!seen.has(f.name)) {
         next.push(f);
         seen.add(f.name);
+      } else {
+        skipped += 1;
       }
     }
     setImageFiles(next);
+    setDuplicateSkipNotice(skipped);
   }
 
   function onRemoveImage(name: string) {
     setImageFiles((prev) => prev.filter((f) => f.name !== name));
+    setDuplicateSkipNotice(0);
   }
 
   return (
@@ -305,6 +318,17 @@ export function BatchUploadPage() {
               data-testid="input-images"
             />
           </label>
+          {duplicateSkipNotice > 0 && (
+            <p
+              data-testid="duplicate-skip-notice"
+              className="text-sm text-status-review-text"
+            >
+              Skipped {duplicateSkipNotice} duplicate file
+              {duplicateSkipNotice === 1 ? "" : "s"} (matching filename already
+              selected). Remove the existing entry first if you meant to
+              replace it.
+            </p>
+          )}
           {imageFiles.length > 0 && (
             <ul
               data-testid="image-list"
