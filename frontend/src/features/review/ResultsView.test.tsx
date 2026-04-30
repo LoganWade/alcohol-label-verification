@@ -136,4 +136,35 @@ describe("<ResultsView>", () => {
       "This tool assists review and does not replace reviewer judgment.",
     );
   });
+
+  describe("bounding-box preview", () => {
+    it("renders the bbox preview when an imageUrl is provided", () => {
+      render(<ResultsView response={FULL_FIXTURE} imageUrl="/label.png" />);
+      fireEvent.click(screen.getByTestId("toggle-brand_name"));
+      const evidence = screen.getByTestId("evidence-brand_name");
+      expect(
+        within(evidence).getByTestId("bbox-preview"),
+      ).toBeInTheDocument();
+    });
+
+    it("shows the unavailable note when imageUrl is omitted", () => {
+      render(<ResultsView response={FULL_FIXTURE} />);
+      fireEvent.click(screen.getByTestId("toggle-brand_name"));
+      const evidence = screen.getByTestId("evidence-brand_name");
+      expect(evidence.textContent).toContain("Image preview unavailable");
+      expect(
+        within(evidence).queryByTestId("bbox-preview"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render the preview when bbox is null even if imageUrl is given", () => {
+      render(<ResultsView response={FULL_FIXTURE} imageUrl="/label.png" />);
+      fireEvent.click(screen.getByTestId("toggle-country_of_origin"));
+      const evidence = screen.getByTestId("evidence-country_of_origin");
+      expect(evidence.textContent).toContain("No bounding box available");
+      expect(
+        within(evidence).queryByTestId("bbox-preview"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

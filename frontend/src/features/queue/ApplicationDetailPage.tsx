@@ -10,6 +10,7 @@ import { ResultsView } from "@/features/review/ResultsView";
 import {
   BatchApiError,
   getApplication,
+  getApplicationImageUrl,
   setApplicationDecision,
 } from "@/lib/api/batches";
 import {
@@ -186,7 +187,15 @@ function PipelineSection({ app }: { app: BatchApplication }) {
     return <ErrorPanel error={app.error} />;
   }
   if (app.analyze) {
-    return <ResultsView response={app.analyze} />;
+    // Prefer the primary image; fall back to the first image if no
+    // image has been flagged primary (the manifest parser should
+    // prevent that, but we render defensively).
+    const previewImage =
+      app.images.find((img) => img.is_primary) ?? app.images[0] ?? null;
+    const imageUrl = previewImage
+      ? getApplicationImageUrl(app.id, previewImage.id)
+      : null;
+    return <ResultsView response={app.analyze} imageUrl={imageUrl} />;
   }
   return (
     <div className="card p-u-3 text-ink-500" data-testid="pipeline-empty">

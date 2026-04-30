@@ -137,7 +137,13 @@ export function ReviewNewPage() {
       });
     },
     onSuccess: (data) => {
-      navigate(`/review/${data.review_id}`, { state: { response: data } });
+      // Pass an object URL alongside the response so the results page
+      // can render the bounding-box crop preview. The URL is revoked
+      // by ResultsPage when it unmounts.
+      const imageUrl = file ? URL.createObjectURL(file) : null;
+      navigate(`/review/${data.review_id}`, {
+        state: { response: data, imageUrl },
+      });
     },
     onError: (err) => {
       // Ignore abort — the user clicked Cancel and we just bounce back.

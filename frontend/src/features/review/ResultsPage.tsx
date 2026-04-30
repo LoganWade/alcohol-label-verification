@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Download, Printer, RotateCcw } from "lucide-react";
 import type { AnalyzeResponse } from "@/lib/types/api";
@@ -6,6 +7,7 @@ import { Button } from "@/components/Button";
 
 interface RouteState {
   response?: AnalyzeResponse;
+  imageUrl?: string | null;
 }
 
 export function ResultsPage() {
@@ -13,6 +15,17 @@ export function ResultsPage() {
   const navigate = useNavigate();
   const state = (location.state as RouteState | null) ?? null;
   const response = state?.response ?? null;
+  const imageUrl = state?.imageUrl ?? null;
+
+  // Revoke any blob: URL we received when the page unmounts so we don't
+  // leak the object reference. Same-origin http(s) URLs are left alone.
+  useEffect(() => {
+    return () => {
+      if (imageUrl && imageUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [imageUrl]);
 
   if (!response) {
     return (
@@ -45,7 +58,7 @@ export function ResultsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-u-3 py-u-4 space-y-u-3">
-      <ResultsView response={response} />
+      <ResultsView response={response} imageUrl={imageUrl} />
 
       <footer className="border-t border-ink-200 pt-u-3 mt-u-3 space-y-u-2 no-print">
         <div className="flex flex-wrap gap-u-1">

@@ -276,6 +276,34 @@ class BatchStore:
             row = cur.fetchone()
             return row["stored_path"] if row else None
 
+    def get_image_for_application(
+        self, application_id: str, image_id: str
+    ) -> tuple[str, str, str] | None:
+        """Return ``(stored_path, content_type, filename)`` for one image
+        belonging to the given application, or ``None`` if there is no row
+        matching both IDs.
+
+        Both IDs are required (and must match) so callers cannot use one
+        application's id to fetch another application's image.
+        """
+
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT stored_path, content_type, filename FROM label_images
+                WHERE id = ? AND application_id = ?
+                """,
+                (image_id, application_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return (
+                row["stored_path"],
+                row["content_type"],
+                row["filename"],
+            )
+
     def get_application_fields(self, application_id: str) -> ApplicationFields | None:
         """Return the importer-stated fields for one application."""
 

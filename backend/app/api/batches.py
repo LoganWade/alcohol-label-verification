@@ -32,6 +32,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from app.core.constants import WorkflowStatus
@@ -409,6 +410,57 @@ async def get_application(application_id: str) -> Application:
             http_status=status.HTTP_404_NOT_FOUND,
         )
     return app
+
+
+# ---------------------------------------------------------------------------
+# GET /applications/{id}/images/{image_id}
+# ---------------------------------------------------------------------------
+@router.get(
+    "/applications/{application_id}/images/{image_id}",
+    responses={404: {"model": AnalyzeError}},
+)
+async def get_application_image(
+    application_id: str, image_id: str
+) -> FileResponse:
+    """Serve the on-disk bytes for one label image.
+
+    Both ``application_id`` and ``image_id`` must match a single row in
+    ``label_images``; that pairing prevents callers from using one
+    application's id to read another's image. Returns 404 if either id
+    is unknown or if the on-disk file has been removed.
+    """
+
+    record = get_store().get_image_for_application(application_id, image_id)
+    if record is None:
+        raise _http_error(
+            code="image_not_found",
+            message=(
+                f"No image with id {image_id!r} exists for application "
+                f"{application_id!r}."
+            ),
+            http_status=status.HTTP_404_NOT_FOUND,
+        )
+    stored_path, content_type, filename = record
+    path = Path(stored_path)
+    if not path.is_file():
+        # The DB row points to a missing file. Treat as 404 so the UI
+        # falls back gracefully instead of returning a 500.
+        logger.warning(
+            "Image %s for application %s is missing on disk at %s",
+            image_id,
+            application_id,
+            stored_path,
+        )
+        raise _http_error(
+            code="image_not_found",
+            message="The image file is no longer available on disk.",
+            http_status=status.HTTP_404_NOT_FOUND,
+        )
+    return FileResponse(
+        str(path),
+        media_type=content_type or "application/octet-stream",
+        filename=filename,
+    )
 
 
 # ---------------------------------------------------------------------------

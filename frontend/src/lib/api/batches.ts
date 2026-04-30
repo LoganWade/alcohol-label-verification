@@ -149,6 +149,19 @@ export async function getApplication(
   return (await res.json()) as BatchApplication;
 }
 
+/**
+ * Build the URL for an application's image. Used directly as `<img src=...>`
+ * so the browser caches it; we do not fetch through this layer.
+ */
+export function getApplicationImageUrl(
+  applicationId: string,
+  imageId: string,
+): string {
+  return `${API_BASE_URL}/applications/${encodeURIComponent(
+    applicationId,
+  )}/images/${encodeURIComponent(imageId)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Mutate
 // ---------------------------------------------------------------------------
