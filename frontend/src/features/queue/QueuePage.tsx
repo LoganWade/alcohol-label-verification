@@ -289,6 +289,7 @@ function ApplicationsTable({
           <tr>
             <th className="px-u-2 py-u-1 font-medium">Serial #</th>
             <th className="px-u-2 py-u-1 font-medium">Brand</th>
+            <th className="px-u-2 py-u-1 font-medium">Image</th>
             <th className="px-u-2 py-u-1 font-medium">Pipeline</th>
             <th className="px-u-2 py-u-1 font-medium">Result</th>
             <th className="px-u-2 py-u-1 font-medium">Workflow</th>
@@ -296,7 +297,10 @@ function ApplicationsTable({
           </tr>
         </thead>
         <tbody>
-          {applications.map((a) => (
+          {applications.map((a) => {
+            const primary =
+              a.images.find((img) => img.is_primary) ?? a.images[0] ?? null;
+            return (
             <tr
               key={a.id}
               className="border-b border-ink-100 last:border-0 hover:bg-ink-50"
@@ -306,6 +310,13 @@ function ApplicationsTable({
                 {a.fields.serial_number}
               </td>
               <td className="px-u-2 py-u-2">{a.fields.brand_name ?? "\u2014"}</td>
+              <td
+                className="px-u-2 py-u-2 font-mono text-xs text-ink-700 max-w-[14rem] truncate"
+                title={primary?.filename ?? undefined}
+                data-testid={`app-image-${a.id}`}
+              >
+                {primary?.filename ?? "\u2014"}
+              </td>
               <td className="px-u-2 py-u-2">
                 <ProcessingBadge status={a.processing_status} />
               </td>
@@ -333,7 +344,8 @@ function ApplicationsTable({
                 </Link>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
