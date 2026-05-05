@@ -20,8 +20,8 @@ from rapidfuzz import fuzz
 
 from app.core.constants import (
     DEFAULT_GOVERNMENT_WARNING,
-    FUZZY_MATCH_THRESHOLD,
     GOVERNMENT_WARNING_HEADER,
+    WARNING_WORDING_THRESHOLD,
     Confidence,
     FieldStatus,
 )
@@ -82,7 +82,7 @@ def validate_warning(
     raw_norm = normalize_for_comparison(raw)
     expected_norm = normalize_for_comparison(expected)
     wording_score = fuzz.token_set_ratio(raw_norm, expected_norm)
-    wording_match = wording_score >= FUZZY_MATCH_THRESHOLD
+    wording_match = wording_score >= WARNING_WORDING_THRESHOLD
 
     if header_caps_ok and wording_match:
         return WarningValidation(

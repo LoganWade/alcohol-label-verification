@@ -22,6 +22,20 @@ class BoundingBox(BaseModel):
     def as_tuple(self) -> tuple[int, int, int, int]:
         return (self.x0, self.y0, self.x1, self.y1)
 
+    def union(self, other: "BoundingBox") -> "BoundingBox":
+        """Return the smallest axis-aligned box containing both inputs.
+
+        Used by the field extractor to merge per-line OCR tokens into a
+        single evidence box for multi-line fields like the Government
+        Warning paragraph.
+        """
+        return BoundingBox(
+            x0=min(self.x0, other.x0),
+            y0=min(self.y0, other.y0),
+            x1=max(self.x1, other.x1),
+            y1=max(self.y1, other.y1),
+        )
+
 
 class OcrToken(BaseModel):
     """A single OCR token with text, position, and confidence.

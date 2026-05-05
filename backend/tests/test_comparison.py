@@ -59,21 +59,52 @@ class TestExactMatch:
 
 
 class TestFuzzyTiers:
-    def test_high_similarity_is_match(self):
-        # One letter different. token_set_ratio is high.
+    def test_single_char_typo_is_needs_review(self):
+        # Single-character typo on a multi-word brand. fuzz.ratio scores
+        # this around 97, just below the Match threshold of 98, so it
+        # surfaces for reviewer eyes instead of silently passing.
+        # This is the behavior the previous token_set_ratio implementation
+        # missed: it scored 97.6 for the same input but landed in the
+        # Match tier because the typo was in only one of four tokens.
         result = compare_field(
             field=FieldName.BRAND_NAME,
             expected="Old Tom Distillery",
             extracted=_extracted("Old Tom Distilery"),
         )
-        # token_set_ratio for one-character typo on a long string is in the
-        # 95+ band; this should be a Match with a similarity note.
-        assert result.status == FieldStatus.MATCH
+        assert result.status == FieldStatus.NEEDS_REVIEW
         assert "similarity" in result.reason.lower()
 
+    def test_typo_brand_sample_lands_in_needs_review(self):
+        # Regression test for the typo_brand sample
+        # (sample_data/labels/typo_brand.png shows STONE'S THROW WINEERY,
+        # expected_fields/typo_brand.json says STONE'S THROW WINERY).
+        # Under the previous token_set_ratio implementation this scored
+        # 97.6 and silently passed as Match -- defeating the purpose of
+        # the seeded scenario. Pin it to Needs Review here so the bug
+        # cannot regress.
+        result = compare_field(
+            field=FieldName.BRAND_NAME,
+            expected="STONE'S THROW WINERY",
+            extracted=_extracted("STONE'S THROW WINEERY"),
+        )
+        assert result.status == FieldStatus.NEEDS_REVIEW
+
+    def test_extra_word_is_not_silently_matched(self):
+        # token_set_ratio scored this 100 (the intersection covers both
+        # original tokens), so an importer-supplied "Cabernet Sauvignon"
+        # would silently match a label that read "Cabernet Sauvignon
+        # Reserve" -- a meaningfully different product.
+        # fuzz.ratio scores it ~82, which lands in Needs Review.
+        result = compare_field(
+            field=FieldName.CLASS_TYPE,
+            expected="Cabernet Sauvignon",
+            extracted=_extracted("Cabernet Sauvignon Reserve"),
+        )
+        assert result.status == FieldStatus.NEEDS_REVIEW
+
     def test_partial_similarity_is_needs_review(self):
-        # "Old Tom Distilleries" vs "Old Tom Distillery":
-        # plural form yields token_set_ratio ~89, in the Needs Review band.
+        # "Old Tom Distilleries" vs "Old Tom Distillery": plural form yields
+        # fuzz.ratio ~89, in the Needs Review band.
         result = compare_field(
             field=FieldName.BRAND_NAME,
             expected="Old Tom Distillery",
@@ -99,6 +130,31 @@ class TestFuzzyTiers:
             extracted=_extracted("Old Tom Brewery"),
         )
         assert result.status == FieldStatus.MISMATCH
+
+
+class TestWordSetEquality:
+    """Tier 2: punctuation/whitespace differences that survive Tier 1 must
+    still resolve to Match without being penalized as fuzzy partial matches.
+    """
+
+    def test_apostrophe_dropped_is_match(self):
+        # Stone's vs Stones -> same word set under the alphanumeric tokenizer,
+        # so this is formatting noise, not a real word edit.
+        result = compare_field(
+            field=FieldName.BRAND_NAME,
+            expected="STONE'S THROW WINERY",
+            extracted=_extracted("STONES THROW WINERY"),
+        )
+        assert result.status == FieldStatus.MATCH
+        assert "punctuation" in result.reason.lower()
+
+    def test_comma_dropped_in_bottler_is_match(self):
+        result = compare_field(
+            field=FieldName.BOTTLER,
+            expected="Bottled by Stone's Throw Winery, Napa, CA",
+            extracted=_extracted("Bottled by Stones Throw Winery Napa CA"),
+        )
+        assert result.status == FieldStatus.MATCH
 
 
 class TestConfidencePropagation:

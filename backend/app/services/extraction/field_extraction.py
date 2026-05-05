@@ -26,6 +26,18 @@ _NET_CONTENTS_PATTERN = re.compile(
 )
 _WARNING_ANCHOR = "GOVERNMENT WARNING"
 
+# Tokens whose top edge falls within this many pixels of the previous warning
+# token's bottom edge are treated as a continuation of the same warning block.
+# PaddleOCR returns one token per text line, and the statutory paragraph spans
+# 4-5 lines on a typical TTB label. Without this stitching we'd capture only
+# the "GOVERNMENT WARNING:" header line and the validator would see a 71%
+# wording-similarity score against the expected paragraph -- exactly the
+# behavior reported on the skewed_lowlight sample.
+# 80 px is generous enough to absorb baseline jitter on rotated/skewed labels
+# (where OCR boxes drift vertically) but tight enough to not glom unrelated
+# bottom-of-label text (provenance, country of origin, etc.) into the warning.
+_WARNING_LINE_GAP_PX = 80
+
 
 def _confidence_tier(score: float) -> Confidence:
     if score >= 0.90:
@@ -62,18 +74,57 @@ def extract_fields(tokens: Sequence[OcrToken]) -> ExtractedFields:
     # ordinal heuristics here; Phase 2 introduces real spatial reasoning.
     sorted_tokens = sorted(tokens, key=lambda t: (t.bbox.y0, t.bbox.x0))
 
+    # State for stitching multi-line warning text. Once we see the
+    # "GOVERNMENT WARNING" anchor, every subsequent token whose top edge is
+    # within _WARNING_LINE_GAP_PX of the previous warning token's bottom edge
+    # is folded into the warning. We also track the lowest confidence seen
+    # across the block so the validator can downgrade if any line was unsure.
+    warning_parts: list[str] = []
+    warning_bbox = None
+    warning_min_confidence: float | None = None
+    warning_last_y1: float | None = None
+
+    def _flush_warning() -> None:
+        nonlocal warning, warning_parts
+        if not warning_parts:
+            return
+        joined = "\n".join(warning_parts)
+        assert warning_bbox is not None
+        assert warning_min_confidence is not None
+        warning = ExtractedField(
+            field=FieldName.WARNING,
+            raw_text=joined,
+            normalized_text=joined,
+            evidence_bbox=warning_bbox,
+            confidence=_confidence_tier(warning_min_confidence),
+        )
+
     for token in sorted_tokens:
         text = token.text
         tier = _confidence_tier(token.confidence)
 
-        if _WARNING_ANCHOR in text.upper() and warning.raw_text is None:
-            warning = ExtractedField(
-                field=FieldName.WARNING,
-                raw_text=text,
-                normalized_text=text,
-                evidence_bbox=token.bbox,
-                confidence=tier,
+        # Continuation: we're already collecting a warning block and this token
+        # is vertically adjacent to the last one we kept.
+        if (
+            warning_parts
+            and warning_last_y1 is not None
+            and token.bbox.y0 - warning_last_y1 <= _WARNING_LINE_GAP_PX
+        ):
+            warning_parts.append(text)
+            warning_bbox = warning_bbox.union(token.bbox)  # type: ignore[union-attr]
+            warning_min_confidence = min(
+                warning_min_confidence,  # type: ignore[type-var]
+                token.confidence,
             )
+            warning_last_y1 = token.bbox.y1
+            continue
+
+        # Anchor: first time we see "GOVERNMENT WARNING". Start collecting.
+        if _WARNING_ANCHOR in text.upper() and not warning_parts:
+            warning_parts = [text]
+            warning_bbox = token.bbox
+            warning_min_confidence = token.confidence
+            warning_last_y1 = token.bbox.y1
             continue
 
         if _ABV_PATTERN.search(text) and abv.raw_text is None:
@@ -127,6 +178,8 @@ def extract_fields(tokens: Sequence[OcrToken]) -> ExtractedFields:
                 confidence=tier,
             )
             continue
+
+    _flush_warning()
 
     return ExtractedFields(
         brand_name=brand,

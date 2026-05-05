@@ -82,9 +82,23 @@ class ImageAttribution(StrEnum):
 # ---------------------------------------------------------------------------
 # Comparison thresholds
 # ---------------------------------------------------------------------------
-# rapidfuzz token_set_ratio thresholds (0-100). Tunable here, nowhere else.
-FUZZY_MATCH_THRESHOLD = 95
-FUZZY_NEEDS_REVIEW_THRESHOLD = 85
+# rapidfuzz `fuzz.ratio` thresholds (0-100) for the generic field comparator.
+# Tunable here, nowhere else. Tier 3 in services.validation.comparison; Tier 2
+# (word-set equality) already absorbs formatting-only differences before this
+# runs, so any score below FUZZY_MATCH_THRESHOLD reflects a real word-level
+# edit and deserves reviewer eyes.
+FUZZY_MATCH_THRESHOLD = 98
+FUZZY_NEEDS_REVIEW_THRESHOLD = 80
+
+# Separate threshold for the dedicated Government Warning validator. The
+# warning is a long statutory paragraph (~55 words) compared with
+# `fuzz.token_set_ratio`, which is forgiving of word-order and whitespace
+# but penalizes substantive wording differences. 95 is the historical sweet
+# spot: tight enough to catch missing or rewritten clauses, loose enough that
+# OCR noise on a single line doesn't tank the whole paragraph score.
+# Kept distinct from FUZZY_MATCH_THRESHOLD so the per-field comparator can
+# be tuned without dragging the warning validator with it.
+WARNING_WORDING_THRESHOLD = 95
 
 # OCR token confidence (0.0-1.0) below which we propagate uncertainty by
 # downgrading a Match to Needs Review.
