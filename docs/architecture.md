@@ -105,15 +105,20 @@ Each stage is a separate Python module under `backend/app/services/` with typed 
 **Algorithm:**
 1. Unicode NFKC normalization on copies.
 2. Case-fold, collapse whitespace, normalize quotes/dashes.
-3. If equal → `Match` (with a "normalized" note when the raw values differed).
-4. Otherwise compute `rapidfuzz.token_set_ratio`:
-   - ≥95 → `Match`
-   - 85–94 → `Needs Review`
-   - <85 → `Mismatch`
-5. If OCR confidence on the underlying tokens is `low`, downgrade `Match` to `Needs Review` (uncertainty propagates).
-6. If no candidate exists for a required field → `Missing`.
+3. If equal post-normalization → `Match` (with a "normalized" note when the raw values differed).
+4. Word-set equality (lowercase alphanumeric tokens, apostrophes stripped). If both sides have the same word set, the only differences are punctuation/whitespace formatting noise → `Match`. This is what catches `STONE'S THROW WINERY` vs `STONES THROW WINERY` without false-flagging it as a typo.
+5. Otherwise compute `rapidfuzz.fuzz.ratio` (character-level Levenshtein) on the normalized strings:
+   - ≥98 → `Match`
+   - 80–97 → `Needs Review`
+   - <80 → `Mismatch`
+6. If OCR confidence on the underlying tokens is `low`, downgrade `Match` to `Needs Review` (uncertainty propagates).
+7. If no candidate exists for a required field → `Missing`.
 
-The thresholds live in a single constants module so they are inspectable, testable, and tunable without scattering magic numbers.
+We deliberately use `fuzz.ratio` (character-level) instead of `fuzz.token_set_ratio` for tier 5: `token_set_ratio` deduplicates and intersects tokens, so it scored `STONE'S THROW WINERY` vs `STONE'S THROW WINEERY` at 97.6 (above the match threshold) and `Cabernet Sauvignon` vs `Cabernet Sauvignon Reserve` at 100 — both clear failure modes for this domain. `fuzz.ratio` penalizes intra-word edits and missing/extra tokens proportionally.
+
+The Government Warning validator (§4.6) keeps its own threshold and still uses `token_set_ratio`, because a long statutory paragraph wants whole-paragraph word coverage and is genuinely tolerant of word-order/whitespace noise.
+
+All thresholds live in a single constants module so they are inspectable, testable, and tunable without scattering magic numbers.
 
 ### 4.6 Warning validation
 A dedicated, opinionated validator — never the generic comparison stage. The Government Warning is the field most often abused on real labels (Jenny's testimony) and the field most consequential for compliance.
