@@ -76,7 +76,8 @@ Each stage is a separate Python module under `backend/app/services/` with typed 
 ### 4.1 Preprocess
 **Input:** raw uploaded image bytes.
 **Output:** preprocessed image array + `ImageQualityReport` (resolution, blur score, estimated skew angle, contrast score, overall quality tier).
-**Operations:** EXIF rotation fix, deskew, resize to a target long edge, contrast normalization, optional perspective correction (stretch).
+**Operations:** EXIF rotation fix → quality metrics (blur via Laplacian variance, contrast via grayscale std-dev) → skew estimation via `cv2.minAreaRect` on a Canny edge mask → **deskew rotation** when `|estimated_skew| ≥ 1.0°` (canvas expanded with white fill, bicubic resampling, no clipping) → resize to a target long edge → PNG encode for OCR. Optional perspective correction is a stretch goal.
+**Why deskew matters:** PaddleOCR's line detector drops entire lines on photos rotated more than a few degrees. The seeded `skewed_lowlight` sample (7° rotation) went from "warning header only" to the full warning paragraph being captured after deskew was added.
 **Budget:** ~300ms typical.
 
 ### 4.2 OCR

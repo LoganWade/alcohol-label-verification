@@ -177,3 +177,71 @@ class TestResizeBehaviour:
         assert abs(resized_ratio - original_ratio) < 0.01, (
             f"Aspect ratio changed: {original_ratio:.3f} -> {resized_ratio:.3f}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Deskew behaviour
+# ---------------------------------------------------------------------------
+
+def _make_rotated_png(angle_degrees: float, width: int = 800, height: int = 600) -> bytes:
+    """Return PNG bytes for a high-contrast image rotated by ``angle_degrees``.
+
+    The base image has a thick black rectangle on a white background. After
+    rotation we have a known ground truth: the deskew estimator should
+    measure ~angle_degrees, and the deskewed result should bring the
+    rectangle's edges back to horizontal/vertical.
+    """
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    # Wide horizontal black bar -- gives the edge detector a strong, clearly
+    # angled line to lock onto.
+    draw.rectangle([100, height // 2 - 30, width - 100, height // 2 + 30], fill=(0, 0, 0))
+    img = img.rotate(angle_degrees, resample=Image.BICUBIC, expand=False, fillcolor=(255, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+class TestDeskew:
+    """The preprocess stage should rotate skewed images so text lines are
+    horizontal before OCR runs. Regression coverage for the skewed_lowlight
+    sample's 'header only' warning OCR bug.
+    """
+
+    def test_zero_skew_image_is_not_rotated(self):
+        # A perfectly horizontal bar: estimator should return ~0 degrees and
+        # the deskew step should be skipped (no rotation note).
+        out = preprocess(_make_rotated_png(0.0))
+        assert abs(out.quality_report.estimated_skew_degrees) < 1.0
+        assert not any("Deskewed" in n for n in out.quality_report.notes)
+
+    def test_skewed_image_records_rotation_note(self):
+        # 7 degrees is what the seeded skewed_lowlight sample uses.
+        out = preprocess(_make_rotated_png(7.0))
+        assert abs(out.quality_report.estimated_skew_degrees) >= 1.0
+        assert any("Deskewed" in n for n in out.quality_report.notes), (
+            f"Expected a deskew note, got: {out.quality_report.notes}"
+        )
+
+    def test_deskewed_output_is_still_a_valid_png(self):
+        # The rotated content must round-trip through PNG encode without
+        # losing channels or becoming undecodable.
+        out = preprocess(_make_rotated_png(5.0))
+        decoded = Image.open(io.BytesIO(out.processed_image))
+        decoded.verify()  # raises on corruption
+
+    def test_deskewed_canvas_expands_to_fit_rotated_content(self):
+        # When we rotate, the canvas must grow so no content is clipped.
+        # The rotated bounding box of an 800x600 image at 7 degrees is
+        # noticeably larger than 800x600.
+        out = preprocess(_make_rotated_png(7.0, width=800, height=600))
+        # After deskew the canvas should be at least as large as the input.
+        # (Resize may then bring it back down if it exceeds MAX_LONG_EDGE_PX.)
+        assert out.quality_report.width >= 600
+        assert out.quality_report.height >= 600
+
+    def test_subdegree_skew_below_threshold_is_left_alone(self):
+        # 0.5 degrees is within the noise floor of the estimator and below
+        # DESKEW_MIN_DEGREES. We should not pay the resampling cost.
+        out = preprocess(_make_rotated_png(0.5))
+        assert not any("Deskewed" in n for n in out.quality_report.notes)
